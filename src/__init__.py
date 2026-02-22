@@ -1,0 +1,1 @@
+"""Granular data grouping package."""

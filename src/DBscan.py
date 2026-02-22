@@ -6,7 +6,7 @@ from scipy.spatial.distance import pdist
 from sklearn.cluster import DBSCAN
 from matplotlib.colors import PowerNorm
 from math import sqrt
-import KNN as KNN
+from . import KNN as KNN
 from sklearn.metrics import accuracy_score
 
 

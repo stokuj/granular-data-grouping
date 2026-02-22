@@ -76,12 +76,14 @@ P3_k = \sqrt{N} \times \left(\frac{1}{d_k}\right)^2.
 
 ```text
 project_root/
-├── point_generators.py      # Generowanie danych
-├── DBscan.py                # Implementacja DBSCAN
-├── KNN.py                   # Implementacja algorytmu kNN
-├── main.py                  # Skrypt eksperymentalny
+├── pyproject.toml
+├── uv.lock
+├── src/
+│   ├── point_generators.py  # Generowanie danych
+│   ├── DBscan.py            # Implementacja DBSCAN
+│   ├── KNN.py               # Implementacja algorytmu kNN
+│   └── main.py              # Skrypt eksperymentalny
 ├── wyniki_czasu_wykonania.csv
-├── requirements.txt
 └── results/
     ├── circle/...
     ├── ring/...
@@ -102,14 +104,14 @@ project_root/
 ```bash
 git clone https://github.com/użytkownik/projekt-klastrowania.git
 cd projekt-klastrowania
-pip install -r requirements.txt
+uv sync
 ```
 
 ## Użytkowanie przykładowe
 
 ### Generowanie danych
 ```python
-import point_generators as pg
+from src import point_generators as pg
 # generuj 800 punktów w kole o promieniu 50 + 200 punktów szumu
 pg.generate_points_circle(
     output_folder='results/circle',
@@ -122,7 +124,7 @@ pg.generate_points_circle(
 
 ### DBSCAN
 ```python
-from DBscan import DBscanAlgorithmLoop, DBscanChart, DBscan
+from src.DBscan import DBscanAlgorithmLoop, DBscanChart, DBscan
 # iteracja po eps ∈ [2,20], step=0.5, MinPts ∈ [5,50]
 DBscanAlgorithmLoop(2,20,0.5,5,50,'results/circle')
 # analiza wykresów i wybór optymalnych parametrów
@@ -140,7 +142,7 @@ DBscan(
 
 ### Single / Complete Linkage
 ```python
-from main import makeDendrogram, LinkageAlgorithmLoop, LinkageAlgorithm
+from src.main import makeDendrogram, LinkageAlgorithmLoop, LinkageAlgorithm
 # oblicz zakres d_min, d_max
 d_min, d_max = makeDendrogram('results/circle/points.txt', method='single', draw=True)
 # iteracja po 200 krokach
@@ -167,19 +169,19 @@ LinkageAlgorithm(
 
 ## Szczegóły implementacji
 
-1. `point_generators.py`:
+1. `src/point_generators.py`:
    - Funkcja `generate_points`: wrapper wybierający odpowiedni generator.
    - Formaty wyjściowe: `points.txt` z trzema kolumnami (x, y, etykieta).
 
-2. `DBscan.py`:
+2. `src/DBscan.py`:
    - `DBscanAlgorithmLoop`: zapisuje wyniki P1–P15 do CSV.
    - `DBscanChart`: rysuje wykresy miar vs eps / MinPts.
    - `DBscan`: generuje ostateczne klastry i zapisuje `DBscanResults.csv`.
 
-3. `KNN.py`:
+3. `src/KNN.py`:
    - Łatwa integracja z `LinkageAlgorithmLoop` do obliczania metryk P1–P15.
 
-4. `main.py`:
+4. `src/main.py`:
    - Import wszystkich modułów.
    - Konfiguracja parametrów eksperymentu.
    - Pętle po poziomach szumu, promieniach i kształtach.
@@ -291,12 +293,14 @@ P3_k = \sqrt{N} \times \left(\frac{1}{d_k}\right)^2.
 
 ```text
 project_root/
-├── point_generators.py      # Data generation
-├── DBscan.py                # DBSCAN implementation
-├── KNN.py                   # kNN algorithm implementation
-├── main.py                  # Experimental script
+├── pyproject.toml
+├── uv.lock
+├── src/
+│   ├── point_generators.py  # Data generation
+│   ├── DBscan.py            # DBSCAN implementation
+│   ├── KNN.py               # kNN algorithm implementation
+│   └── main.py              # Experimental script
 ├── wyniki_czasu_wykonania.csv
-├── requirements.txt
 └── results/
     ├── circle/...
     ├── ring/...
@@ -317,14 +321,14 @@ project_root/
 ```bash
 git clone https://github.com/user/clustering-project.git
 cd clustering-project
-pip install -r requirements.txt
+uv sync
 ```
 
 ## Example Usage
 
 ### Data Generation
 ```python
-import point_generators as pg
+from src import point_generators as pg
 # generate 800 points in a circle with radius 50 + 200 noise points
 pg.generate_points_circle(
     output_folder='results/circle',
@@ -337,7 +341,7 @@ pg.generate_points_circle(
 
 ### DBSCAN
 ```python
-from DBscan import DBscanAlgorithmLoop, DBscanChart, DBscan
+from src.DBscan import DBscanAlgorithmLoop, DBscanChart, DBscan
 # iterate over eps ∈ [2,20], step=0.5, MinPts ∈ [5,50]
 DBscanAlgorithmLoop(2,20,0.5,5,50,'results/circle')
 # analyze charts and select optimal parameters
@@ -355,7 +359,7 @@ DBscan(
 
 ### Single / Complete Linkage
 ```python
-from main import makeDendrogram, LinkageAlgorithmLoop, LinkageAlgorithm
+from src.main import makeDendrogram, LinkageAlgorithmLoop, LinkageAlgorithm
 # calculate d_min, d_max range
 d_min, d_max = makeDendrogram('results/circle/points.txt', method='single', draw=True)
 # iterate over 200 steps
@@ -382,19 +386,19 @@ LinkageAlgorithm(
 
 ## Implementation Details
 
-1. `point_generators.py`:
+1. `src/point_generators.py`:
    - Function `generate_points`: wrapper selecting the appropriate generator.
    - Output formats: `points.txt` with three columns (x, y, label).
 
-2. `DBscan.py`:
+2. `src/DBscan.py`:
    - `DBscanAlgorithmLoop`: saves P1–P15 results to CSV.
    - `DBscanChart`: draws charts of measures vs eps / MinPts.
    - `DBscan`: generates final clusters and saves `DBscanResults.csv`.
 
-3. `KNN.py`:
+3. `src/KNN.py`:
    - Easy integration with `LinkageAlgorithmLoop` for calculating P1–P15 metrics.
 
-4. `main.py`:
+4. `src/main.py`:
    - Import of all modules.
    - Configuration of experiment parameters.
    - Loops over noise levels, radii, and shapes.
