@@ -570,13 +570,22 @@ def run_experiments():
     #     writer = csv.writer(file)
     #     writer.writerow(['generator', 'noisePoints', 'circle_radius', 'time_dbscan', 'time_single', 'time_complete'])
 
-    for noisePoints in range(300, 701, 100):
+    # Pętla szumu 30% - 70%, skok 10%
+    noise_percentages = [30, 40, 50, 60, 70]
+
+    for noise_percent in noise_percentages:
+        noisePoints = int((noise_percent / 100) * 1000)
         num_points = 1000 - noisePoints
 
+        # Pętla generatora - kształu
         for folder, (generator_function, shape_name) in generators.items():
+            # Pętlna rozmiaru koła jeżeli koło - aktulanie działą raz więc to NIE PĘTLA!
             for circle_radius in np.arange(30, 31, 20):
-                print(circle_radius, noisePoints, generator_function)
+                #print(circle_radius, noisePoints, generator_function.__name__)
 
+                ##############################################################
+                ### GENEREATE POINTS
+                ##############################################################
                 experiment_subpath = (
                     f"{folder}/{circle_radius}/{noisePoints}"
                     if generator_function != pg.generate_points_in_shape
@@ -599,7 +608,8 @@ def run_experiments():
                         num_points,
                         maxSize,
                     )
-
+                ##############################################################
+                
                 # # Wczytanie danych z pliku
                 data = np.loadtxt(points_file)
 
@@ -623,105 +633,105 @@ def run_experiments():
                     "k9_p3",
                 ]
 
-                ### Single i complete linkage
-                methods = ["single", "complete"]
+                # ### Single i complete linkage
+                # methods = ["single", "complete"]
 
-                for method in methods:
-                    start_time = time.time()
+                # for method in methods:
+                #     start_time = time.time()
 
-                    # Tworzenie dendrogramu i uruchamianie pętli algorytmu Linkage
-                    min_distance, max_distance = makeDendrogram(
-                        file_path=f"{path}/points.txt", method=method, draw=False
-                    )
-                    result_path = f"{path}/{method}/{method}LinkageLoopResults.csv"
-                    LinkageAlgorithmLoop(
-                        path=path,
-                        file_path=f"{path}/points.txt",
-                        method=method,
-                        max_d=min_distance,
-                        max_d_range=max_distance,
-                        num_measurements=200,
-                        result_path=result_path,
-                    )
-                    p_val = LinkageChart(file_path=result_path, draw=False)
+                #     # Tworzenie dendrogramu i uruchamianie pętli algorytmu Linkage
+                #     min_distance, max_distance = makeDendrogram(
+                #         file_path=f"{path}/points.txt", method=method, draw=False
+                #     )
+                #     result_path = f"{path}/{method}/{method}LinkageLoopResults.csv"
+                #     LinkageAlgorithmLoop(
+                #         path=path,
+                #         file_path=f"{path}/points.txt",
+                #         method=method,
+                #         max_d=min_distance,
+                #         max_d_range=max_distance,
+                #         num_measurements=200,
+                #         result_path=result_path,
+                #     )
+                #     p_val = LinkageChart(file_path=result_path, draw=False)
 
-                    # Uruchamianie algorytmu kNN i algorytmu Linkage
-                    for k in k_names:
-                        k_val = KNN.kNNAlgorithm(
-                            data,
-                            k=k,
-                            folder=path,
-                            show_picture=False,
-                            save_picture=False,
-                            name=None,
-                        )
-                        LinkageAlgorithm(
-                            file_path=f"{path}/points.txt",
-                            method=method,
-                            max_d=k_val,
-                            name=f"k{k}",
-                            folder=path,
-                            show_picture=False,
-                        )
+                #     # Uruchamianie algorytmu kNN i algorytmu Linkage
+                #     for k in k_names:
+                #         k_val = KNN.kNNAlgorithm(
+                #             data,
+                #             k=k,
+                #             folder=path,
+                #             show_picture=False,
+                #             save_picture=False,
+                #             name=None,
+                #         )
+                #         LinkageAlgorithm(
+                #             file_path=f"{path}/points.txt",
+                #             method=method,
+                #             max_d=k_val,
+                #             name=f"k{k}",
+                #             folder=path,
+                #             show_picture=False,
+                #         )
 
-                    # Uruchamianie algorytmu Linkage dla każdego p w p_names
-                    for i, p in enumerate(p_names):
-                        LinkageAlgorithm(
-                            file_path=f"{path}/points.txt",
-                            method=method,
-                            max_d=p_val[i],
-                            name=p,
-                            folder=path,
-                            show_picture=False,
-                        )
-                    end_time = time.time()
-                    elapsed_time = end_time - start_time
+                #     # Uruchamianie algorytmu Linkage dla każdego p w p_names
+                #     for i, p in enumerate(p_names):
+                #         LinkageAlgorithm(
+                #             file_path=f"{path}/points.txt",
+                #             method=method,
+                #             max_d=p_val[i],
+                #             name=p,
+                #             folder=path,
+                #             show_picture=False,
+                #         )
+                #     end_time = time.time()
+                #     elapsed_time = end_time - start_time
 
-                    if method == "single":
-                        time_single = elapsed_time
-                    else:
-                        time_complete = elapsed_time
+                #     if method == "single":
+                #         time_single = elapsed_time
+                #     else:
+                #         time_complete = elapsed_time
 
-                ### DBscan
-                start_time = time.time()
+                # ### DBscan
+                # start_time = time.time()
 
-                db.DBscanAlgorithmLoop(2, 20.0, 0.2, 20, 150, folder=path)
+                # db.DBscanAlgorithmLoop(2, 20.0, 0.2, 20, 150, folder=path)
 
-                for i in range(1, 21):
-                    ep, samp, p_val = db.DBscanChart(
-                        folder=path, show_picture=False, p_id=f"p{i}"
-                    )
-                    db.DBscan(
-                        file_path=f"{path}/points.txt",
-                        folder=path,
-                        epsilon=ep,
-                        samples=samp,
-                        p_id=f"p{i}",
-                        p_val=p_val,
-                    )
+                # for i in range(1, 16):
+                #     ep, samp, p_val = db.DBscanChart(
+                #         folder=path, show_picture=False, p_id=f"p{i}"
+                #     )
+                #     db.DBscan(
+                #         file_path=f"{path}/points.txt",
+                #         folder=path,
+                #         epsilon=ep,
+                #         samples=samp,
+                #         p_id=f"p{i}",
+                #         p_val=p_val,
+                #     )
 
-                end_time = time.time()
-                time_dbscan = end_time - start_time
+                # end_time = time.time()
+                # time_dbscan = end_time - start_time
 
-                ### Zapis wyników do pliku CSV
-                with open(csv_file, mode="a", newline="") as file:
-                    writer = csv.writer(file)
-                    writer.writerow(
-                        [
-                            folder,
-                            noisePoints,
-                            circle_radius,
-                            time_dbscan,
-                            time_single,
-                            time_complete,
-                        ]
-                    )
+                # ### Zapis wyników do pliku CSV
+                # with open(csv_file, mode="a", newline="") as file:
+                #     writer = csv.writer(file)
+                #     writer.writerow(
+                #         [
+                #             folder,
+                #             noisePoints,
+                #             circle_radius,
+                #             time_dbscan,
+                #             time_single,
+                #             time_complete,
+                #         ]
+                #     )
 
-                # ### Wykresy
-                pg.create_combined_plot(path)
+                # # ### Wykresy
+                # pg.create_combined_plot(path)
 
-                if generator_function == pg.generate_points_in_shape:
-                    break
+                # if generator_function == pg.generate_points_in_shape:
+                #     break
 
 
 if __name__ == "__main__":

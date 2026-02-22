@@ -1,15 +1,24 @@
 # Granular Data Clustering in Python
 
-## Introduction
+This project explores **granular one-cluster extraction**: instead of partitioning data into many groups, we identify one dominant, internally coherent cluster and treat the remaining points as noise. The implementation combines and adapts DBSCAN, Single Linkage, and Complete Linkage, then evaluates them on synthetic datasets with controlled noise levels.
 
-Data clustering is one of the fundamental techniques of data exploration, used in many fields of science and industry, such as:
+## Project Structure
 
-- Biochemical analysis (clustering of gene sequences)
-- Customer segmentation in marketing
-- Anomaly detection in cybersecurity
-- Visualization of large datasets
-
-In this project, we focus on **granular data clustering into a single group**. The goal is to extract a large, internally coherent cluster and classify the remaining points as noise.
+```text
+project_root/
+├── pyproject.toml
+├── uv.lock
+├── src/
+│   ├── point_generators.py  # Data generation
+│   ├── DBscan.py            # DBSCAN implementation
+│   ├── KNN.py               # kNN algorithm implementation
+│   └── main.py              # Experimental script
+├── wyniki_czasu_wykonania.csv
+└── results/
+    ├── circle/...
+    ├── ring/...
+    └── normal/...
+```
 
 ## Problem Domain
 
@@ -71,24 +80,6 @@ P3_k = \sqrt{N} \times \left(\frac{1}{d_k}\right)^2.
 ### Complete Linkage
 - Principle: distance between clusters = maximum distance between points.
 - Advantage: creates more compact clusters; disadvantage: sensitive to isolated points.
-
-## Project Structure
-
-```text
-project_root/
-├── pyproject.toml
-├── uv.lock
-├── src/
-│   ├── point_generators.py  # Data generation
-│   ├── DBscan.py            # DBSCAN implementation
-│   ├── KNN.py               # kNN algorithm implementation
-│   └── main.py              # Experimental script
-├── wyniki_czasu_wykonania.csv
-└── results/
-    ├── circle/...
-    ├── ring/...
-    └── normal/...
-```
 
 ## Requirements
 - Python 3.9+

@@ -4,11 +4,45 @@ import numpy as np
 import matplotlib.pyplot as plt
 import os
 import math
+from collections.abc import Callable
+from typing import TypeAlias, cast
 from matplotlib.path import Path
 from PIL import Image
+from numpy.typing import NDArray
+
+FloatArray: TypeAlias = NDArray[np.float64]
+PointSeries: TypeAlias = FloatArray | tuple[float, ...]
+CirclePoints: TypeAlias = tuple[FloatArray, FloatArray, FloatArray, FloatArray]
+ShapePoints: TypeAlias = tuple[
+    tuple[float, ...], tuple[float, ...], FloatArray, FloatArray
+]
+CircleGenerator: TypeAlias = Callable[[int, float, int, float], CirclePoints]
+ShapeGenerator: TypeAlias = Callable[[int, str, int, float], ShapePoints]
+GeneratorFunction: TypeAlias = CircleGenerator | ShapeGenerator
 
 
-def generate_points_circle(noisePoints, circle_radius, num_points, maxSize):
+def generate_points_circle(
+    noisePoints: int, circle_radius: float, num_points: int, maxSize: float
+) -> CirclePoints:
+    """
+    Generate points inside a circle and uniform noise points.
+
+    Parameters
+    ----------
+    noisePoints : int
+        Number of uniformly random noise points.
+    circle_radius : float
+        Radius of the generated circle.
+    num_points : int
+        Number of points generated for the circle distribution.
+    maxSize : float
+        Half-range of the square domain ``[-maxSize, maxSize]``.
+
+    Returns
+    -------
+    tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]
+        ``(x_circle, y_circle, x_random, y_random)`` arrays.
+    """
     offsetX = np.random.uniform(-(maxSize - circle_radius), maxSize - circle_radius)
     offsetY = np.random.uniform(-(maxSize - circle_radius), maxSize - circle_radius)
 
@@ -37,7 +71,28 @@ def generate_points_circle(noisePoints, circle_radius, num_points, maxSize):
     return x_circle, y_circle, x_random, y_random
 
 
-def generate_points_mises(noisePoints, circle_radius, num_points, maxSize):
+def generate_points_mises(
+    noisePoints: int, circle_radius: float, num_points: int, maxSize: float
+) -> CirclePoints:
+    """
+    Generate points using a Von Mises-based radial distribution and noise points.
+
+    Parameters
+    ----------
+    noisePoints : int
+        Number of uniformly random noise points.
+    circle_radius : float
+        Radius scaling factor for generated points.
+    num_points : int
+        Number of points generated for the main distribution.
+    maxSize : float
+        Half-range of the square domain ``[-maxSize, maxSize]``.
+
+    Returns
+    -------
+    tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]
+        ``(x_circle, y_circle, x_random, y_random)`` arrays.
+    """
     offsetX = np.random.uniform(-(maxSize - circle_radius), maxSize - circle_radius)
     offsetY = np.random.uniform(-(maxSize - circle_radius), maxSize - circle_radius)
 
@@ -66,7 +121,28 @@ def generate_points_mises(noisePoints, circle_radius, num_points, maxSize):
     return x_circle, y_circle, x_random, y_random
 
 
-def generate_points_normal(noisePoints, circle_radius, num_points, maxSize):
+def generate_points_normal(
+    noisePoints: int, circle_radius: float, num_points: int, maxSize: float
+) -> CirclePoints:
+    """
+    Generate points using a normal radial distribution and noise points.
+
+    Parameters
+    ----------
+    noisePoints : int
+        Number of uniformly random noise points.
+    circle_radius : float
+        Standard deviation used for radial sampling.
+    num_points : int
+        Number of points generated for the main distribution.
+    maxSize : float
+        Half-range of the square domain ``[-maxSize, maxSize]``.
+
+    Returns
+    -------
+    tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]
+        ``(x_circle, y_circle, x_random, y_random)`` arrays.
+    """
     offsetX = np.random.uniform(-(maxSize - circle_radius), maxSize - circle_radius)
     offsetY = np.random.uniform(-(maxSize - circle_radius), maxSize - circle_radius)
 
@@ -95,7 +171,28 @@ def generate_points_normal(noisePoints, circle_radius, num_points, maxSize):
     return x_circle, y_circle, x_random, y_random
 
 
-def generate_points_ring(noisePoints, circle_radius, num_points, maxSize):
+def generate_points_ring(
+    noisePoints: int, circle_radius: float, num_points: int, maxSize: float
+) -> CirclePoints:
+    """
+    Generate points in a ring-like region and uniform noise points.
+
+    Parameters
+    ----------
+    noisePoints : int
+        Number of uniformly random noise points.
+    circle_radius : float
+        Outer ring radius parameter.
+    num_points : int
+        Number of points generated for the ring distribution.
+    maxSize : float
+        Half-range of the square domain ``[-maxSize, maxSize]``.
+
+    Returns
+    -------
+    tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]
+        ``(x_circle, y_circle, x_random, y_random)`` arrays.
+    """
     offsetX = np.random.uniform(-(maxSize - circle_radius), maxSize - circle_radius)
     offsetY = np.random.uniform(-(maxSize - circle_radius), maxSize - circle_radius)
 
@@ -124,13 +221,34 @@ def generate_points_ring(noisePoints, circle_radius, num_points, maxSize):
     return x_circle, y_circle, x_random, y_random
 
 
-def generate_points_in_shape(noisePoints, shape_name, num_points, maxSize):
+def generate_points_in_shape(
+    noisePoints: int, shape_name: str, num_points: int, maxSize: float
+) -> ShapePoints:
+    """
+    Generate points inside a custom shape and uniform noise points.
+
+    Parameters
+    ----------
+    noisePoints : int
+        Number of uniformly random noise points.
+    shape_name : str
+        Path to a text file describing shape vertices.
+    num_points : int
+        Number of points to sample inside the shape.
+    maxSize : float
+        Half-range of the square domain ``[-maxSize, maxSize]``.
+
+    Returns
+    -------
+    tuple[tuple[float, ...], tuple[float, ...], np.ndarray, np.ndarray]
+        ``(x_points, y_points, x_random, y_random)`` where shape points are tuples.
+    """
     x_random = np.random.uniform(-maxSize, maxSize, noisePoints)
     y_random = np.random.uniform(-maxSize, maxSize, noisePoints)
 
     shape = Path(read_shape_from_file(shape_name))
     bounds = [(-maxSize, maxSize), (-maxSize, maxSize)]
-    points_inside = []
+    points_inside: list[tuple[float, float]] = []
     while len(points_inside) < num_points:
         x = np.random.uniform(*bounds[0])
         y = np.random.uniform(*bounds[1])
@@ -143,22 +261,29 @@ def generate_points_in_shape(noisePoints, shape_name, num_points, maxSize):
     x_points, y_points = zip(*points_inside)
     return x_points, y_points, x_random, y_random
 
+def save_points_to_file(
+    x_circle: PointSeries,
+    y_circle: PointSeries,
+    x_random: PointSeries,
+    y_random: PointSeries,
+    folder: str,
+) -> None:
+    """
+    Save generated points with labels to ``points.txt``.
 
-def plot_points(
-    x_circle, y_circle, x_random, y_random, folder, save_picture, show_picture
-):
-    plt.figure()
-    plt.plot(x_circle, y_circle, "ro", ms=2)
-    plt.plot(x_random, y_random, "bo", ms=2)
-    if save_picture:
-        output_file = f"{folder}/points.png"
-        plt.savefig(output_file, dpi=1000)
-    if show_picture:
-        plt.show()
-    plt.close()
-
-
-def save_points_to_file(x_circle, y_circle, x_random, y_random, folder):
+    Parameters
+    ----------
+    x_circle : np.ndarray | tuple
+        X coordinates of main distribution points.
+    y_circle : np.ndarray | tuple
+        Y coordinates of main distribution points.
+    x_random : np.ndarray | tuple
+        X coordinates of noise points.
+    y_random : np.ndarray | tuple
+        Y coordinates of noise points.
+    folder : str
+        Output directory where ``points.txt`` is saved.
+    """
     # Convert tuples to NumPy arrays if not already arrays
     x_circle = np.array(x_circle) if isinstance(x_circle, tuple) else x_circle
     y_circle = np.array(y_circle) if isinstance(y_circle, tuple) else y_circle
@@ -187,8 +312,21 @@ def save_points_to_file(x_circle, y_circle, x_random, y_random, folder):
     np.savetxt(file_path, data, fmt="%.4f %.4f %d")
 
 
-def read_shape_from_file(file_path):
-    points = []
+def read_shape_from_file(file_path: str) -> list[tuple[float, float]]:
+    """
+    Read shape vertices from a text file.
+
+    Parameters
+    ----------
+    file_path : str
+        Path to a file where each line has ``x,y`` coordinates.
+
+    Returns
+    -------
+    list[tuple[float, float]]
+        List of 2D vertices parsed from the file.
+    """
+    points: list[tuple[float, float]] = []
     with open(file_path, "r") as file:
         for line in file:
             # Rozdziel linie na części używając przecinka jako separatora
@@ -199,36 +337,63 @@ def read_shape_from_file(file_path):
 
 
 def generate_points(
-    generator_function,
-    folder,
-    noisePoints,
-    circle_radius,
-    shape_name,
-    num_points,
-    maxSize,
-):
+    generator_function: GeneratorFunction,
+    folder: str,
+    noisePoints: int,
+    circle_radius: float,
+    shape_name: str | None,
+    num_points: int,
+    maxSize: float,
+) -> None:
+    """
+    Generate point sets, plot them, and save them to disk.
+
+    Parameters
+    ----------
+    generator_function : callable
+        Point generator to call.
+    folder : str
+        Output directory for generated files.
+    noisePoints : int
+        Number of uniformly random noise points.
+    circle_radius : float
+        Radius argument for circle-based generators.
+    shape_name : str | None
+        Shape file path for shape-based generation.
+    num_points : int
+        Number of main distribution points.
+    maxSize : float
+        Half-range of the square domain ``[-maxSize, maxSize]``.
+    """
     if shape_name:
-        x_circle, y_circle, x_random, y_random = generator_function(
+        shape_generator = cast(ShapeGenerator, generator_function)
+        x_circle, y_circle, x_random, y_random = shape_generator(
             noisePoints, shape_name, num_points, maxSize
         )
     else:
-        x_circle, y_circle, x_random, y_random = generator_function(
+        circle_generator = cast(CircleGenerator, generator_function)
+        x_circle, y_circle, x_random, y_random = circle_generator(
             noisePoints, circle_radius, num_points, maxSize
         )
 
-    plot_points(
-        x_circle,
-        y_circle,
-        x_random,
-        y_random,
-        folder=folder,
-        save_picture=True,
-        show_picture=False,
-    )
+
     save_points_to_file(x_circle, y_circle, x_random, y_random, folder=folder)
 
 
-def create_combined_plot(path):
+def create_combined_plot(path: str) -> bool:
+    """
+    Combine existing result images into one grid image.
+
+    Parameters
+    ----------
+    path : str
+        Base experiment directory containing output image subfolders.
+
+    Returns
+    -------
+    bool
+        ``True`` if a combined image was saved, otherwise ``False``.
+    """
     image_paths_and_titles = [
         (f"{path}/complete/clustering_p1.png", "Complete p1"),
         (f"{path}/complete/clustering_p2.png", "Complete p2"),
@@ -318,7 +483,6 @@ def create_combined_plot(path):
     # Zapisz złożony obraz
     combined_image.save(output_path, format="PNG", dpi=(1000, 1000))
 
-    print("Done")
     return True
 
     ################################################################################################################################
