@@ -13,8 +13,8 @@ project_root/
 │   ├── DBscan.py            # DBSCAN implementation
 │   ├── KNN.py               # kNN algorithm implementation
 │   └── main.py              # Experimental script
-├── wyniki_czasu_wykonania.csv
 └── results/
+    ├── time_of_exec.csv
     ├── circle/...
     ├── ring/...
     └── normal/...
