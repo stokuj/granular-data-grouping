@@ -23,11 +23,11 @@ project_root/
 ## Problem Domain
 
 1. **Cluster Analysis**
-   - Techniques of unsupervised classification of unlabeled data.
+    - Techniques of unsupervised classification of unlabeled data.
 2. **Granular Computing**
-   - Information management by creating data granules at different levels of detail.
+    - Information management by creating data granules at different levels of detail.
 3. **Cluster Detection in Noise**
-   - Identification of significant structures even in the presence of a large number of interfering points.
+    - Identification of significant structures even in the presence of a large number of interfering points.
 
 ## Research Objectives
 
