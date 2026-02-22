@@ -287,6 +287,10 @@ def create_combined_plot(path):
         if os.path.exists(img_path)
     ]
 
+    if not image_paths_and_titles:
+        print(f"No plots found for {path}, skipping combined plot.")
+        return False
+
     # Oblicz liczbę wierszy i kolumn potrzebnych do wyświetlenia wszystkich obrazów
     num_images = len(image_paths_and_titles)
     cols = 3
@@ -315,5 +319,6 @@ def create_combined_plot(path):
     combined_image.save(output_path, format="PNG", dpi=(1000, 1000))
 
     print("Done")
+    return True
 
     ################################################################################################################################
