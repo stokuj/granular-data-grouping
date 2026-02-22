@@ -55,17 +55,26 @@ Granular clustering is based on combining two complementary measures:
    - Average distance to the k-th neighbor (d_k)
 
 Criteria formulas:
-```math
-P1 = N \times \frac{1}{\bar{d}}                \\
-P2 = N \times \left(\frac{1}{\bar{d}}\right)^2  \\
+
+$$
+P1 = N \times \frac{1}{\bar{d}}
+$$
+
+$$
+P2 = N \times \left(\frac{1}{\bar{d}}\right)^2
+$$
+
+$$
 P3 = \sqrt{N} \times \left(\frac{1}{\bar{d}}\right)^2
-```
+$$
+
 and variants:
-```math
-P1_k = N \times \frac{1}{d_k},
-P2_k = N \times \left(\frac{1}{d_k}\right)^2,
-P3_k = \sqrt{N} \times \left(\frac{1}{d_k}\right)^2.
-```
+
+$$
+P1_k = N \times \frac{1}{d_k}, \quad
+P2_k = N \times \left(\frac{1}{d_k}\right)^2, \quad
+P3_k = \sqrt{N} \times \left(\frac{1}{d_k}\right)^2
+$$
 
 ## Theoretical Foundations of Algorithms
 
