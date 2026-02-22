@@ -170,22 +170,22 @@ LinkageAlgorithm(
 ## Implementation Details
 
 1. `src/point_generators.py`:
-   - Function `generate_points`: wrapper selecting the appropriate generator.
-   - Output formats: `points.txt` with three columns (x, y, label).
+    - Function `generate_points`: wrapper selecting the appropriate generator.
+    - Output formats: `points.txt` with three columns (x, y, label).
 
 2. `src/DBscan.py`:
-   - `DBscanAlgorithmLoop`: saves P1–P15 results to CSV.
-   - `DBscanChart`: draws charts of measures vs eps / MinPts.
-   - `DBscan`: generates final clusters and saves `DBscanResults.csv`.
+    - `DBscanAlgorithmLoop`: saves P1–P15 results to CSV.
+    - `DBscanChart`: draws charts of measures vs eps / MinPts.
+    - `DBscan`: generates final clusters and saves `DBscanResults.csv`.
 
 3. `src/KNN.py`:
-   - Easy integration with `LinkageAlgorithmLoop` for calculating P1–P15 metrics.
+    - Easy integration with `LinkageAlgorithmLoop` for calculating P1–P15 metrics.
 
 4. `src/main.py`:
-   - Import of all modules.
-   - Configuration of experiment parameters.
-   - Loops over noise levels, radii, and shapes.
-   - Saving results to `wyniki_czasu_wykonania.csv`.
+    - Import of all modules.
+    - Configuration of experiment parameters.
+    - Loops over noise levels, radii, and shapes.
+    - Saving results to `wyniki_czasu_wykonania.csv`.
 
 ## Experimental Results
 
@@ -208,7 +208,6 @@ LinkageAlgorithm(
 - Application of hybrid algorithms (DBSCAN + hierarchical).
 - Extrapolation to multidimensional data and dynamic data streams.
 
-## Author and License
+## License
 
-- **Author**: Krystian Stasica
-- **License**: MIT
+This project is released under the MIT License. See the `LICENSE` file.
