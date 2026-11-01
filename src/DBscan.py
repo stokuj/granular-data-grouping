@@ -10,6 +10,9 @@ from sklearn.neighbors import NearestNeighbors
 # jest przypięta w uv.lock. Przy zmianie wersji sprawdź, czy DBSCAN.fit nadal
 # robi to samo (radius_neighbors -> n_neighbors >= min_samples -> dbscan_inner).
 from sklearn.cluster._dbscan_inner import dbscan_inner
+from collections import Counter
+
+from . import KNN as KNN
 from .granule import P_IDS, criteria, is_admissible
 from sklearn.metrics import accuracy_score
 
@@ -26,15 +29,18 @@ DBSCAN_COLUMNS = [
 ] + P_IDS
 
 
-def _granule_metrics(cluster_data, admissible, n_total, mean_d_all):
-    """Średnia i odchylenie odległości w klastrze oraz p1..p16 (tylko dla dopuszczalnych)."""
+def _granule_metrics(cluster_data, admissible, n_total, mean_d_all, d3_all):
+    """Średnia i odchylenie odległości w klastrze oraz kryteria z P_IDS (tylko dla dopuszczalnych).
+
+    Stabilność (ostatnia kolumna) zostaje 0; DBscanAlgorithmLoop dopisuje ją po całej siatce.
+    """
     p = [0.0] * len(P_IDS)
     if len(cluster_data) < 2:
         return 0.0, 0.0, p
     distances = pdist(cluster_data)
     mean_distance, std_distance = np.mean(distances), np.std(distances)
     if admissible and mean_distance != 0 and std_distance != 0:
-        p = criteria(cluster_data, mean_distance, n_total, mean_d_all)
+        p = criteria(cluster_data, mean_distance, n_total, mean_d_all, d3_all) + [0.0]
     return mean_distance, std_distance, p
 
 
@@ -49,16 +55,18 @@ def DBscanAlgorithmLoop(
       to, co robi DBSCAN.fit po wyszukaniu sąsiadów,
     - metryki granuli liczone raz na każdy unikalny klaster (wiele par parametrów
       daje dokładnie ten sam klaster),
-    - p1..p16 liczone tylko dla kandydatów dopuszczalnych (tylko te są wybierane).
+    - kryteria z P_IDS liczone tylko dla kandydatów dopuszczalnych (tylko te są wybierane).
     """
     data = np.loadtxt(f"{folder}/points.txt")
     # Tylko x, y: etykieta nie może wpływać na odległości
     dataForDBSCAN = data[:, :2]
     n_total = len(dataForDBSCAN)
     mean_d_all = pdist(dataForDBSCAN).mean()
+    (d3_all,) = KNN.knn_mean_distances(dataForDBSCAN, (3,))
     os.makedirs(f"{folder}/dbScan", exist_ok=True)
 
     results = []
+    keys = []
     cache = {}
 
     epsilon = min_epsilon
@@ -86,8 +94,9 @@ def DBscanAlgorithmLoop(
 
             key = (cluster_idx.tobytes(), admissible)
             if key not in cache:
-                cache[key] = _granule_metrics(dataForDBSCAN[cluster_idx], admissible, n_total, mean_d_all)
+                cache[key] = _granule_metrics(dataForDBSCAN[cluster_idx], admissible, n_total, mean_d_all, d3_all)
             mean_distance, std_distance, p = cache[key]
+            keys.append(key)
 
             results.append(
                 [round(epsilon, 2), min_samples, p_cluster, no_noise,
@@ -96,6 +105,12 @@ def DBscanAlgorithmLoop(
 
         epsilon += epsilon_step
         epsilon = round(epsilon, 2)
+
+    # p18 (stabilność): ile par (eps, min_samples) z siatki daje dokładnie tę granulę
+    stability = Counter(k for k in keys if k[1])
+    for row, key in zip(results, keys):
+        if key[1]:
+            row[-1] = float(stability[key])
 
     results_df = pd.DataFrame(results, columns=DBSCAN_COLUMNS)
     results_df.to_csv(f"{folder}/dbScan/dbScanResults.csv", index=False)

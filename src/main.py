@@ -63,6 +63,7 @@ def LinkageCandidates(file_path, method, result_path):
     row_sum, row_sum_sq = D.sum(axis=1), D_sq.sum(axis=1)
     all_pairs_sum, all_pairs_sq = D.sum() / 2, D_sq.sum() / 2
     mean_d_all = all_pairs_sum / (n_total * (n_total - 1) / 2)
+    (d3_all,) = KNN.knn_mean_distances(data, (3,))
 
     # Dla każdego klastra: punkty, suma (i suma kwadratów) odległości wewnątrz,
     # oraz suma wierszy macierzy odległości (potrzebna do statystyk szumu)
@@ -106,7 +107,8 @@ def LinkageCandidates(file_path, method, result_path):
         noise_mean, noise_std = _mean_std(noise_sum, noise_sq, remaining * (remaining - 1) / 2)
         admissible = is_admissible(N, n_total)
 
-        p = criteria(data[granule], mean_d, n_total, mean_d_all) if admissible \
+        # Stabilność (ostatnia kolumna) dopisujemy niżej, gdy znany jest przedział d_max
+        p = criteria(data[granule], mean_d, n_total, mean_d_all, d3_all) + [0.0] if admissible \
             else [0.0] * len(P_IDS)
 
         rows.append(
@@ -114,11 +116,16 @@ def LinkageCandidates(file_path, method, result_path):
              mean_d, std_d, noise_mean, noise_std] + p
         )
 
-    # Przedział stałej granuli: od tego połączenia do następnego kandydata
+    # Przedział stałej granuli: od tego połączenia do następnego kandydata.
+    # p18 (stabilność) = ln(high / low): długość przedziału w skali logarytmicznej,
+    # więc nie zależy od jednostek odległości.
+    condition_col = LINKAGE_COLUMNS.index("condition")
     for i, row in enumerate(rows):
         low = row[0]
         high = rows[i + 1][0] if i + 1 < len(rows) else low
         row[0:1] = [(low + high) / 2, low, high]
+        if row[condition_col] == "yes" and low > 0 and high > low:
+            row[-1] = float(np.log(high / low))
 
     pd.DataFrame(rows, columns=LINKAGE_COLUMNS).to_csv(result_path, index=False)
 
@@ -138,7 +145,7 @@ def LinkageAlgorithm(file_path, method, max_d):
 
 
 def LinkageBest(file_path):
-    """d_max maksymalizujące każde z kryteriów p1..p16 wśród dopuszczalnych kandydatów."""
+    """d_max maksymalizujące każde z kryteriów z P_IDS wśród dopuszczalnych kandydatów."""
     data = pd.read_csv(file_path)
     data = data[data["condition"] == "yes"]
     if data.empty:

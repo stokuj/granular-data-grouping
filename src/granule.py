@@ -16,25 +16,40 @@ def is_admissible(n_granule, n_total, min_fraction=MIN_GRANULE_FRACTION):
     return n_granule >= min_fraction * n_total and n_granule < n_total
 
 
-# p1..p15: N lub sqrt(N) razy 1/d lub 1/d^2, d = średnia odległość w granuli albo d_k
-# (k = 3, 5, 7, 9); p16: znormalizowane kryterium Pedrycza (pokrycie x specyficzność)
-P_IDS = [f"p{i}" for i in range(1, 17)]
+# Numery jak w pierwotnym zestawie p1..p16, żeby wcześniejsze wyniki dalej się zgadzały.
+# Usunięte: p2 i p3 (zawsze dolna granica rozmiaru granuli) oraz p7..p15 (d_k dla
+# k = 5, 7, 9 dawało te same wybory co k = 3).
+# p1: N / d̄, gdzie d̄ = średnia odległość par punktów w granuli
+# p4, p5, p6: N / d3, N / d3^2, sqrt(N) / d3^2, gdzie d3 = średnia odległość do 3 sąsiadów
+# p16: znormalizowane kryterium Pedrycza (pokrycie x specyficzność)
+# p17: p16 z drugą specyficznością, lokalną (d3 granuli wobec d3 całego zbioru)
+# p18: stabilność, czyli jak szeroki zakres parametru daje tę samą granulę; liczy ją
+#      metoda (linkage: przedział d_max, DBSCAN: liczba par eps x min_samples)
+CRITERIA_IDS = ["p1", "p4", "p5", "p6", "p16", "p17"]
+STABILITY_ID = "p18"
+P_IDS = CRITERIA_IDS + [STABILITY_ID]
 
 
-def criteria(cluster_data, mean_d, n_total, mean_d_all):
-    """Wartości p1..p16 dla granuli.
+def criteria(cluster_data, mean_d, n_total, mean_d_all, d3_all):
+    """Wartości kryteriów z CRITERIA_IDS dla granuli, w tej samej kolejności.
 
-    mean_d: średnia odległość między parami punktów granuli,
-    mean_d_all: to samo dla całego zbioru (granula + szum).
-    p16 = (N / n_total) * max(0, 1 - mean_d / mean_d_all): pokrycie i specyficzność
-    w przedziale [0, 1], więc wynik nie zależy od jednostek odległości.
+    mean_d, mean_d_all: średnia odległość między parami punktów granuli / całego zbioru,
+    d3_all: średnia odległość do 3 najbliższych sąsiadów w całym zbiorze.
+    p16 = (N / n_total) * (1 - mean_d / mean_d_all): pokrycie i specyficzność w [0, 1],
+    więc wynik nie zależy od jednostek odległości.
+    p17 = p16 * (1 - d3 / d3_all): granula ma być zwarta w całości i gęsta lokalnie.
     """
     N = len(cluster_data)
-    p = [N / mean_d, N / mean_d**2, sqrt(N) / mean_d**2]
-    for d_k in knn_mean_distances(cluster_data, (3, 5, 7, 9)):
-        p += [N / d_k, N / d_k**2, sqrt(N) / d_k**2]
-    p.append((N / n_total) * max(0.0, 1 - mean_d / mean_d_all))
-    return p
+    (d3,) = knn_mean_distances(cluster_data, (3,))
+    p16 = (N / n_total) * max(0.0, 1 - mean_d / mean_d_all)
+    return [
+        N / mean_d,
+        N / d3,
+        N / d3**2,
+        sqrt(N) / d3**2,
+        p16,
+        p16 * max(0.0, 1 - d3 / d3_all),
+    ]
 
 
 def largest_cluster_mask(labels):

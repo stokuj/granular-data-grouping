@@ -55,37 +55,31 @@ Granular clustering is based on combining two complementary measures:
    - Average distance between points (d̄)
    - Average distance to the k-th neighbor (d_k)
 
-Criteria formulas:
+Criteria (numbering kept from the original set P1–P16, so earlier results stay comparable):
 
 $$
-P1 = N \times \frac{1}{\bar{d}}
+P1 = \frac{N}{\bar{d}}, \quad
+P4 = \frac{N}{d_3}, \quad
+P5 = \frac{N}{d_3^2}, \quad
+P6 = \frac{\sqrt{N}}{d_3^2}
 $$
 
-$$
-P2 = N \times \left(\frac{1}{\bar{d}}\right)^2
-$$
+where \(\bar{d}\) is the average pairwise distance in the granule and \(d_3\) the average
+distance to the 3 nearest neighbours. Normalized criteria following Pedrycz's principle of
+justifiable granularity (coverage × specificity, all factors in [0, 1], independent of units):
 
 $$
-P3 = \sqrt{N} \times \left(\frac{1}{\bar{d}}\right)^2
+P16 = \frac{N}{N_{all}} \times \left(1 - \frac{\bar{d}}{\bar{d}_{all}}\right), \quad
+P17 = P16 \times \left(1 - \frac{d_3}{d_{3,all}}\right)
 $$
 
-and variants:
+where \(\bar{d}_{all}\) and \(d_{3,all}\) are computed on the whole data set (negative factors
+are clipped to 0). P18 is a stability criterion: how wide a parameter range yields exactly the
+same granule — \(\ln(d_{max,high} / d_{max,low})\) for linkage, the number of
+(eps, min_samples) grid cells for DBSCAN.
 
-$$
-P1_k = N \times \frac{1}{d_k}, \quad
-P2_k = N \times \left(\frac{1}{d_k}\right)^2, \quad
-P3_k = \sqrt{N} \times \left(\frac{1}{d_k}\right)^2
-$$
-
-for k = 3, 5, 7, 9 (P4–P15), and a normalized criterion following Pedrycz's
-principle of justifiable granularity (coverage × specificity, both in [0, 1],
-independent of distance units):
-
-$$
-P16 = \frac{N}{N_{all}} \times \max\left(0,\ 1 - \frac{\bar{d}}{\bar{d}_{all}}\right)
-$$
-
-where \(\bar{d}_{all}\) is the average pairwise distance in the whole data set.
+Removed: P2, P3 (always pick the smallest admissible granule) and P7–P15 (\(d_k\) for
+k = 5, 7, 9 gave the same choices as k = 3).
 
 ## Theoretical Foundations of Algorithms
 
