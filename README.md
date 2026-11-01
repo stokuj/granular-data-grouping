@@ -77,6 +77,16 @@ P2_k = N \times \left(\frac{1}{d_k}\right)^2, \quad
 P3_k = \sqrt{N} \times \left(\frac{1}{d_k}\right)^2
 $$
 
+for k = 3, 5, 7, 9 (P4–P15), and a normalized criterion following Pedrycz's
+principle of justifiable granularity (coverage × specificity, both in [0, 1],
+independent of distance units):
+
+$$
+P16 = \frac{N}{N_{all}} \times \max\left(0,\ 1 - \frac{\bar{d}}{\bar{d}_{all}}\right)
+$$
+
+where \(\bar{d}_{all}\) is the average pairwise distance in the whole data set.
+
 ## Theoretical Foundations of Algorithms
 
 ### DBSCAN

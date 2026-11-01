@@ -12,7 +12,7 @@ from sklearn.metrics import accuracy_score
 from . import point_generators as pg
 from . import DBscan as db
 from . import KNN as KNN
-from .granule import is_admissible, largest_cluster_mask
+from .granule import P_IDS, criteria, is_admissible, largest_cluster_mask
 
 
 #################################################################################################################################
@@ -32,7 +32,7 @@ LINKAGE_COLUMNS = [
     "std_dev_distance",
     "noise_mean_distance",
     "noise_std_dev_distance",
-] + [f"p{i}" for i in range(1, 16)]
+] + P_IDS
 
 
 def _mean_std(total, total_sq, n_pairs):
@@ -62,6 +62,7 @@ def LinkageCandidates(file_path, method, result_path):
     D_sq = D**2
     row_sum, row_sum_sq = D.sum(axis=1), D_sq.sum(axis=1)
     all_pairs_sum, all_pairs_sq = D.sum() / 2, D_sq.sum() / 2
+    mean_d_all = all_pairs_sum / (n_total * (n_total - 1) / 2)
 
     # Dla każdego klastra: punkty, suma (i suma kwadratów) odległości wewnątrz,
     # oraz suma wierszy macierzy odległości (potrzebna do statystyk szumu)
@@ -105,12 +106,8 @@ def LinkageCandidates(file_path, method, result_path):
         noise_mean, noise_std = _mean_std(noise_sum, noise_sq, remaining * (remaining - 1) / 2)
         admissible = is_admissible(N, n_total)
 
-        p = [0.0] * 15
-        if admissible:
-            cluster_data = data[granule]
-            p[0:3] = [N / mean_d, N / mean_d**2, sqrt(N) / mean_d**2]
-            for j, d_k in enumerate(KNN.knn_mean_distances(cluster_data, (3, 5, 7, 9))):
-                p[3 + 3 * j : 6 + 3 * j] = [N / d_k, N / d_k**2, sqrt(N) / d_k**2]
+        p = criteria(data[granule], mean_d, n_total, mean_d_all) if admissible \
+            else [0.0] * len(P_IDS)
 
         rows.append(
             [height, N, remaining, n_total - (step + 1), "yes" if admissible else "no",
@@ -141,7 +138,7 @@ def LinkageAlgorithm(file_path, method, max_d):
 
 
 def LinkageBest(file_path):
-    """d_max maksymalizujące każde z kryteriów p1..p15 wśród dopuszczalnych kandydatów."""
+    """d_max maksymalizujące każde z kryteriów p1..p16 wśród dopuszczalnych kandydatów."""
     data = pd.read_csv(file_path)
     data = data[data["condition"] == "yes"]
     if data.empty:
@@ -154,7 +151,6 @@ def LinkageBest(file_path):
 ### Eksperymenty: algorytmy zapisują tylko dane, wykresy rysuje src/plots.py na żądanie
 #################################################################################################################################
 
-P_IDS = [f"p{i}" for i in range(1, 16)]
 KNN_HEURISTIC_K = [3, 5, 7, 9]
 LINKAGE_METHODS = ["single", "complete"]
 
