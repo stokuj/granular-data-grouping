@@ -7,6 +7,7 @@ from sklearn.cluster import DBSCAN
 from matplotlib.colors import PowerNorm
 from math import sqrt
 from . import KNN as KNN
+from .granule import is_admissible
 from sklearn.metrics import accuracy_score
 
 
@@ -138,7 +139,10 @@ def DBscanAlgorithmLoop(
                 p14,
                 p15,
             ]
-            if no_clusters == 2 and no_noise != len(dataForDBSCAN) and p_cluster > 100:
+            # Dokładnie jeden klaster (etykieta 0) plus szum, oraz wspólny warunek
+            # dopuszczalności granuli (ten sam co w linkage)
+            found_clusters = set(np.unique(labels)) - {-1}
+            if found_clusters == {0} and is_admissible(p_cluster, len(dataForDBSCAN)):
                 result.insert(4, "yes")
                 results_yes.append(result)
             else:

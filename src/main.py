@@ -1,7 +1,7 @@
 import numpy as np
+import pandas as pd
 import matplotlib.pyplot as plt
 from scipy.cluster.hierarchy import linkage, fcluster, dendrogram
-from scipy.spatial.distance import pdist
 from math import sqrt
 import os
 import csv
@@ -13,6 +13,7 @@ from sklearn.metrics import accuracy_score
 from . import point_generators as pg
 from . import DBscan as db
 from . import KNN as KNN
+from .granule import is_admissible, largest_cluster_mask, distance_stats
 
 
 #################################################################################################################################
@@ -23,16 +24,13 @@ from . import KNN as KNN
 def LinkageAlgorithmLoop(
     path, file_path, method, max_d, num_measurements, max_d_range, result_path
 ):
-    # Wczytanie danych z pliku
-    data = np.loadtxt(file_path)
+    # Wczytanie danych z pliku: tylko x, y (etykieta nie może wpływać na odległości)
+    data = np.loadtxt(file_path)[:, :2]
+    n_total = len(data)
 
-    # Wykonanie algorytmu aglomeracyjnego single linkage
+    # Wykonanie algorytmu aglomeracyjnego (single / complete linkage)
     Z = linkage(data, method=method)
     max_d_step = (max_d_range - max_d) / (num_measurements - 1)
-
-    # Wyświetlenie wyniku
-    # print("Wartość kroku:", max_d_step)
-    #######################################################################
 
     with open(result_path, "w", newline="") as csvfile:
         csvwriter = csv.writer(csvfile)
@@ -43,10 +41,11 @@ def LinkageAlgorithmLoop(
                 "largest_cluster_points",
                 "remaining_points",
                 "num_clusters",
+                "condition",
                 "mean_cluster_distance",
                 "std_dev_distance",
-                "second_mean_cluster_distance",
-                "second_std_dev_distance",
+                "noise_mean_distance",
+                "noise_std_dev_distance",
                 "p1",
                 "p2",
                 "p3",
@@ -67,95 +66,29 @@ def LinkageAlgorithmLoop(
 
         while max_d <= max_d_range:
             clusters = fcluster(Z, max_d, criterion="distance")
+            num_clusters = len(np.unique(clusters))
 
-            # Stworzenie słownika do przechowywania liczności klastrów
-            clusters_count = {}
+            # Granula = największy klaster, cała reszta = szum
+            granule_mask = largest_cluster_mask(clusters)
+            largest_cluster_data = data[granule_mask]
+            largest_cluster_points = len(largest_cluster_data)
+            remaining_points = n_total - largest_cluster_points
 
-            # Obliczenie liczby punktów w każdym klastrze
-            for cluster_id in clusters:
-                if cluster_id not in clusters_count:
-                    clusters_count[cluster_id] = 1
-                else:
-                    clusters_count[cluster_id] += 1
+            # Średnia i odchylenie odległości w granuli oraz w szumie
+            mean_cluster_distance, std_dev_distance = distance_stats(largest_cluster_data)
+            noise_mean_distance, noise_std_dev_distance = distance_stats(
+                data[~granule_mask]
+            )
 
-            # Znalezienie klastra z największą liczbą punktów
-            largest_cluster_id = max(clusters_count, key=clusters_count.get)
-            largest_cluster_points = clusters_count[largest_cluster_id]
-
-            # Początkowa liczba klastrów
-            num_clusters = len(set(clusters))
-            if num_clusters > 2:
-                # Znalezienie identyfikatora klastra z drugą największą liczbą punktów
-                second_largest_cluster_id = sorted(
-                    clusters_count, key=clusters_count.get
-                )[-2]
-            #######################################################################
-            while len(clusters_count) > 2:
-                # Znalezienie identyfikatora klastra z najmniejszą liczbą punktów
-                smallest_cluster_id = min(clusters_count, key=clusters_count.get)
-
-                # Podmiana identyfikatora klastra najmniejszego na identyfikator klastra pośrodku
-                clusters = np.where(
-                    clusters == smallest_cluster_id, second_largest_cluster_id, clusters
-                )
-
-                # Zaktualizowanie statystyki klastrów
-                clusters_count = {}
-                for cluster_id in clusters:
-                    if cluster_id not in clusters_count:
-                        clusters_count[cluster_id] = 1
-                    else:
-                        clusters_count[cluster_id] += 1
-            #######################################################################
-            # Obliczenie średniej i odchylenia standardowego odległości między punktami w największym i drugim co do wielkości klastrze
-            if len(clusters_count) >= 2:
-                largest_cluster_id = max(clusters_count, key=clusters_count.get)
-                largest_cluster_indices = np.where(clusters == largest_cluster_id)[0]
-                if len(largest_cluster_indices) >= 2:
-                    largest_cluster_data = data[largest_cluster_indices]
-                    largest_cluster_distances = pdist(largest_cluster_data)
-                    mean_cluster_distance = np.mean(largest_cluster_distances)
-                    std_dev_distance = np.std(largest_cluster_distances)
-                else:
-                    mean_cluster_distance = 0
-                    std_dev_distance = 0
-
-                second_largest_cluster_id = sorted(
-                    clusters_count, key=clusters_count.get
-                )[-2]
-                second_largest_cluster_indices = np.where(
-                    clusters == second_largest_cluster_id
-                )[0]
-                if len(second_largest_cluster_indices) >= 2:
-                    second_largest_cluster_data = data[second_largest_cluster_indices]
-                    second_largest_cluster_distances = pdist(
-                        second_largest_cluster_data
-                    )
-                    second_mean_cluster_distance = np.mean(
-                        second_largest_cluster_distances
-                    )
-                    second_std_dev_distance = np.std(second_largest_cluster_distances)
-                else:
-                    second_mean_cluster_distance = 0
-                    second_std_dev_distance = 0
-            else:
-                mean_cluster_distance = 0
-                std_dev_distance = 0
-                second_mean_cluster_distance = 0
-                second_std_dev_distance = 0
-
-            # Obliczenie liczby pozostałych punktów
-            remaining_points = len(clusters) - largest_cluster_points
-
-            # Obliczenie liczby klastrów
-            num_clusters = len(set(clusters))
+            # Wspólny warunek dopuszczalności (ten sam co w DBSCAN)
+            admissible = is_admissible(largest_cluster_points, n_total)
 
             p1, p2, p3, p4 = 0, 0, 0, 0
             p5, p6, p7, p8 = 0, 0, 0, 0
             p9, p10, p11, p12 = 0, 0, 0, 0
             p13, p14, p15 = 0, 0, 0
 
-            if mean_cluster_distance != 0 or second_mean_cluster_distance != 0:
+            if admissible:
                 k3 = KNN.kNNAlgorithm(
                     data=largest_cluster_data,
                     k=3,
@@ -208,61 +141,36 @@ def LinkageAlgorithmLoop(
                 p13 = largest_cluster_points * (1 / k9)
                 p14 = largest_cluster_points * (1 / k9**2)
                 p15 = sqrt(largest_cluster_points) * (1 / k9**2)
-            # Zapisz dane do pliku CSV
-            if remaining_points > largest_cluster_points:
-                output_data = [
-                    max_d,
-                    largest_cluster_points,
-                    remaining_points,
-                    num_clusters,
-                    second_mean_cluster_distance,
-                    second_std_dev_distance,
-                    mean_cluster_distance,
-                    std_dev_distance,
-                    p1,
-                    p2,
-                    p3,
-                    p4,
-                    p5,
-                    p6,
-                    p7,
-                    p8,
-                    p9,
-                    p10,
-                    p11,
-                    p12,
-                    p13,
-                    p14,
-                    p15,
-                ]
-            else:
-                output_data = [
-                    max_d,
-                    largest_cluster_points,
-                    remaining_points,
-                    num_clusters,
-                    mean_cluster_distance,
-                    std_dev_distance,
-                    second_mean_cluster_distance,
-                    second_std_dev_distance,
-                    p1,
-                    p2,
-                    p3,
-                    p4,
-                    p5,
-                    p6,
-                    p7,
-                    p8,
-                    p9,
-                    p10,
-                    p11,
-                    p12,
-                    p13,
-                    p14,
-                    p15,
-                ]
 
-            csvwriter.writerow(output_data)
+            # Zapisz dane do pliku CSV (kolumny granuli zawsze opisują granulę)
+            csvwriter.writerow(
+                [
+                    max_d,
+                    largest_cluster_points,
+                    remaining_points,
+                    num_clusters,
+                    "yes" if admissible else "no",
+                    mean_cluster_distance,
+                    std_dev_distance,
+                    noise_mean_distance,
+                    noise_std_dev_distance,
+                    p1,
+                    p2,
+                    p3,
+                    p4,
+                    p5,
+                    p6,
+                    p7,
+                    p8,
+                    p9,
+                    p10,
+                    p11,
+                    p12,
+                    p13,
+                    p14,
+                    p15,
+                ]
+            )
 
             # Zwiększenie wartości d_max o krok
             max_d = max_d + max_d_step
@@ -276,73 +184,12 @@ def LinkageAlgorithm(file_path, method, max_d, name, folder, show_picture=False)
     # Wykonanie algorytmu aglomeracyjnego single linkage
     Z = linkage(data_xy, method=method)
 
-    #######################################################################
-
     # Wyznaczenie klastrów na podstawie dendrogramu
     clusters = fcluster(Z, max_d, criterion="distance")
 
-    #######################################################################
-
-    # Stworzenie słownika do przechowywania liczności klastrów
-    clusters_count = {}
-
-    # Obliczenie liczby punktów w każdym klastrze
-    for cluster_id in clusters:
-        if cluster_id not in clusters_count:
-            clusters_count[cluster_id] = 1
-        else:
-            clusters_count[cluster_id] += 1
-
-    # Znalezienie klastra z największą liczbą punktów
-    largest_cluster_id = max(clusters_count, key=clusters_count.get)
-    largest_cluster_count = clusters_count[largest_cluster_id]
-
-    # Znalezienie identyfikatora klastra z drugą największą liczbą punktów
-    second_largest_cluster_id = sorted(clusters_count, key=clusters_count.get)[-2]
-
-    # Wydrukowanie informacji o klastrze z największą liczbą punktów
-    # print(f"Największy klaster: {largest_cluster_id} - {largest_cluster_count} punktów")
-    # Początkowa liczba klastrów
-    num_clusters = len(set(clusters))
-    if num_clusters > 2:
-        while len(clusters_count) > 2:
-            # Znalezienie identyfikatora klastra z najmniejszą liczbą punktów
-            smallest_cluster_id = min(clusters_count, key=clusters_count.get)
-
-            # Podmiana identyfikatora klastra najmniejszego na identyfikator klastra drugiego największego (szum)
-            clusters = np.where(
-                clusters == smallest_cluster_id, second_largest_cluster_id, clusters
-            )
-
-            # Zaktualizowanie statystyki klastrów
-            clusters_count = {}
-            for cluster_id in clusters:
-                if cluster_id not in clusters_count:
-                    clusters_count[cluster_id] = 1
-                else:
-                    clusters_count[cluster_id] += 1
-
-        #######################################################################
-        # Znalezienie identyfikatora klastra z najmniejszą
-        smallest_cluster_id = min(clusters_count, key=clusters_count.get)
-        # print(smallest_cluster_id)
-        # Znalezienie identyfikatora klastra z największą liczbą punktów
-        largest_cluster_id = max(clusters_count, key=clusters_count.get)
-        # print(largest_cluster_id)
-
-    # Podmiana identyfikatora klastra największego na 1, a drugiego na 2
-    if largest_cluster_count >= 500:
-        clusters = np.where(clusters == largest_cluster_id, 1, 2)
-    else:
-        clusters = np.where(clusters == largest_cluster_id, 2, 1)
-
-    # Zaktualizowanie statystyki klastrów
-    clusters_count = {}
-    for cluster_id in clusters:
-        if cluster_id not in clusters_count:
-            clusters_count[cluster_id] = 1
-        else:
-            clusters_count[cluster_id] += 1
+    # Granula = największy klaster (etykieta 1), cała reszta = szum (etykieta 2),
+    # tak samo jak w points.txt. Bez progów zależnych od prawdziwego podziału.
+    clusters = np.where(largest_cluster_mask(clusters), 1, 2)
 
     # Obliczenie dokładności
     true_labels = data[:, 2].astype(int)
@@ -404,78 +251,34 @@ def LinkageAlgorithm(file_path, method, max_d, name, folder, show_picture=False)
     # print(f"Punkty zapisano do pliku {output_file}")
 
 
-def find_max_and_d_max(param, d_max_values):
-    param_index = np.argmax(param)
-    param_d_max = d_max_values[param_index]
-    return param_d_max
-
-
 def LinkageChart(file_path, draw):
-    # Wczytanie danych z pliku CSV
-    data = np.genfromtxt(file_path, delimiter=",", skip_header=1)
+    # Wczytanie wyników pętli; do wyboru d_max tylko dopuszczalni kandydaci
+    data = pd.read_csv(file_path)
+    data = data[data["condition"] == "yes"]
+    if data.empty:
+        raise ValueError(f"Brak dopuszczalnych kandydatów na granulę w {file_path}")
 
-    # Usunięcie wierszy z wartościami zerowymi
-    data = data[data[:, 5] != 0]
+    d_max_values = data["max_d"].to_numpy()
 
-    # Wyodrębnienie danych
-    d_max_values = data[:, 0]
-    largest_cluster_points = data[:, 1]
-    remaining_points = data[:, 2]
-
-    p1 = data[:, 8]
-    p2 = data[:, 9]
-    p3 = data[:, 10]
-
-    k3_p1 = data[:, 11]
-    k3_p2 = data[:, 12]
-    k3_p3 = data[:, 13]
-
-    k5_p1 = data[:, 14]
-    k5_p2 = data[:, 15]
-    k5_p3 = data[:, 16]
-
-    k7_p1 = data[:, 17]
-    k7_p2 = data[:, 18]
-    k7_p3 = data[:, 19]
-
-    k9_p1 = data[:, 20]
-    k9_p2 = data[:, 21]
-    k9_p3 = data[:, 22]
-
-    p1_index = np.argmax(p1)
-    p1_d_max = d_max_values[p1_index]
-    p2_d_max = find_max_and_d_max(p2, d_max_values)
-    p3_d_max = find_max_and_d_max(p3, d_max_values)
-
-    k3_p1_d_max = find_max_and_d_max(k3_p1, d_max_values)
-    k3_p2_d_max = find_max_and_d_max(k3_p2, d_max_values)
-    k3_p3_d_max = find_max_and_d_max(k3_p3, d_max_values)
-
-    k5_p1_d_max = find_max_and_d_max(k5_p1, d_max_values)
-    k5_p2_d_max = find_max_and_d_max(k5_p2, d_max_values)
-    k5_p3_d_max = find_max_and_d_max(k5_p3, d_max_values)
-
-    k7_p1_d_max = find_max_and_d_max(k7_p1, d_max_values)
-    k7_p2_d_max = find_max_and_d_max(k7_p2, d_max_values)
-    k7_p3_d_max = find_max_and_d_max(k7_p3, d_max_values)
-
-    k9_p1_d_max = find_max_and_d_max(k9_p1, d_max_values)
-    k9_p2_d_max = find_max_and_d_max(k9_p2, d_max_values)
-    k9_p3_d_max = find_max_and_d_max(k9_p3, d_max_values)
+    # d_max maksymalizujące każde z kryteriów p1..p15
+    # (kolejność: p1, p2, p3, k3_p1, k3_p2, k3_p3, ..., k9_p1, k9_p2, k9_p3)
+    p_columns = [f"p{i}" for i in range(1, 16)]
+    best_d_max = [d_max_values[np.argmax(data[col].to_numpy())] for col in p_columns]
 
     if draw:
-        # Tworzenie wykresu zależności od d_max
+        # Liczba punktów w granuli i w szumie w zależności od d_max
         plt.figure(figsize=(15, 6))
-
-        # Wykres dla liczby punktów w największym klastrze
         plt.plot(
             d_max_values,
-            largest_cluster_points,
+            data["largest_cluster_points"],
             label="Liczba punktów w klastrze",
             color="blue",
         )
         plt.plot(
-            d_max_values, remaining_points, label="Liczba punktów w szumie", color="red"
+            d_max_values,
+            data["remaining_points"],
+            label="Liczba punktów w szumie",
+            color="red",
         )
         plt.xlabel("d_max")
         plt.ylabel("Liczba punktów")
@@ -483,50 +286,35 @@ def LinkageChart(file_path, draw):
         plt.grid(True)
         plt.legend()
 
-        # Tworzenie wykresu zależności od d_max
+        # Kryterium p1 w zależności od d_max
+        p1 = data["p1"].to_numpy()
         plt.figure(figsize=(15, 6))
-
-        # Wykres dla liczby punktów w największym klastrze
-        plt.plot(d_max_values, p1, label="test", color="green")
+        plt.plot(d_max_values, p1, label="p1", color="green")
         plt.scatter(
-            p1_d_max, p1[p1_index], color="black", label=f"D_max dla max ({p1_d_max})"
+            best_d_max[0],
+            p1.max(),
+            color="black",
+            label=f"D_max dla max ({best_d_max[0]})",
         )
         plt.xlabel("d_max")
-        plt.ylabel("Liczba punktów")
-        plt.title("Wartość test dla parametru d_max")
+        plt.ylabel("p1")
+        plt.title("Wartość p1 dla parametru d_max")
         plt.grid(True)
         plt.legend()
         plt.show()
-    return [
-        p1_d_max,
-        p2_d_max,
-        p3_d_max,
-        k3_p1_d_max,
-        k3_p2_d_max,
-        k3_p3_d_max,
-        k5_p1_d_max,
-        k5_p2_d_max,
-        k5_p3_d_max,
-        k7_p1_d_max,
-        k7_p2_d_max,
-        k7_p3_d_max,
-        k9_p1_d_max,
-        k9_p2_d_max,
-        k9_p3_d_max,
-    ]
+    return best_d_max
 
 
 def makeDendrogram(file_path, method, draw):
-    # Wczytanie danych z pliku
-    data = np.loadtxt(file_path)
+    # Wczytanie danych z pliku: tylko x, y (etykieta nie może wpływać na odległości)
+    data = np.loadtxt(file_path)[:, :2]
 
-    # Wykonanie algorytmu aglomeracyjnego single linkage
+    # Wykonanie algorytmu aglomeracyjnego (single / complete linkage)
     Z = linkage(data, method=method)
 
-    min_distance = Z[-1, 2]
-    # print("Minimalna odległość w dendrogramie:", min_distance)
-    max_distance = Z[0, 2]
-    # print("Maksymalna odległość w dendrogramie:", max_distance)
+    # Wysokości połączeń w Z rosną: pierwsze połączenie = najmniejsza, ostatnie = największa
+    min_distance = Z[0, 2]
+    max_distance = Z[-1, 2]
 
     if draw:
         plt.figure(figsize=(10, 5))
@@ -535,7 +323,7 @@ def makeDendrogram(file_path, method, draw):
         plt.xlabel("Indeksy danych")
         plt.ylabel("Odległość")
         plt.show()
-    return max_distance, min_distance
+    return min_distance, max_distance
 
 
 #################################################################################################################################
