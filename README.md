@@ -120,7 +120,7 @@ uv run python -m src.main           # full grid: 4 shapes x 5 noise levels
 
 Per configuration (`results/<shape>/<radius>/<noise_points>/`):
 - `points.txt`: x, y, true label (1 = cluster, 2 = noise)
-- `single/`, `complete/`: `*LinkageLoopResults.csv`, one row per d_max candidate
+- `single/`, `complete/`: `*LinkageCandidates.csv`, one row per granule candidate from the tree
 - `dbScan/dbScanResults.csv`: one row per (eps, min_samples) candidate
 - `summary.csv`: best parameters, granule size and accuracy per method x criterion
 - `labels.csv`: selected partitions, one column per method x criterion (e.g. `single_p1`, `dbscan_p3`)

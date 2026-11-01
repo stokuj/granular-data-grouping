@@ -2,8 +2,8 @@ import numpy as np
 import pandas as pd
 from scipy.cluster.hierarchy import linkage, fcluster
 from math import sqrt
+from scipy.spatial.distance import pdist, squareform
 import os
-import csv
 import time
 from sklearn.metrics import accuracy_score
 
@@ -12,7 +12,7 @@ from sklearn.metrics import accuracy_score
 from . import point_generators as pg
 from . import DBscan as db
 from . import KNN as KNN
-from .granule import is_admissible, largest_cluster_mask, distance_stats
+from .granule import is_admissible, largest_cluster_mask
 
 
 #################################################################################################################################
@@ -20,131 +20,111 @@ from .granule import is_admissible, largest_cluster_mask, distance_stats
 #################################################################################################################################
 
 
-def LinkageAlgorithmLoop(
-    path, file_path, method, max_d, num_measurements, max_d_range, result_path
-):
-    # Wczytanie danych z pliku: tylko x, y (etykieta nie może wpływać na odległości)
+LINKAGE_COLUMNS = [
+    "max_d",
+    "max_d_low",
+    "max_d_high",
+    "largest_cluster_points",
+    "remaining_points",
+    "num_clusters",
+    "condition",
+    "mean_cluster_distance",
+    "std_dev_distance",
+    "noise_mean_distance",
+    "noise_std_dev_distance",
+] + [f"p{i}" for i in range(1, 16)]
+
+
+def _mean_std(total, total_sq, n_pairs):
+    """Średnia i odchylenie standardowe z sumy i sumy kwadratów odległości."""
+    if n_pairs <= 0:
+        return 0.0, 0.0
+    mean = total / n_pairs
+    return mean, sqrt(max(total_sq / n_pairs - mean**2, 0.0))
+
+
+def LinkageCandidates(file_path, method, result_path):
+    """Wszyscy kandydaci na granulę z drzewa linkage, każdy dokładnie raz.
+
+    Przechodzi po połączeniach drzewa od najniższego. Kandydat powstaje za każdym
+    razem, gdy rośnie największy klaster. Granula jest taka sama dla każdego cięcia
+    d_max z przedziału [max_d_low, max_d_high), od tego połączenia do następnego
+    kandydata. Jako max_d zapisujemy środek przedziału, żeby fcluster(Z, max_d)
+    odtwarzał granulę także po zaokrągleniu przy zapisie do CSV. Sumy odległości
+    w klastrach są aktualizowane przy każdym połączeniu zamiast liczyć pdist od nowa.
+    """
+    # Tylko x, y: etykieta nie może wpływać na odległości
     data = np.loadtxt(file_path)[:, :2]
     n_total = len(data)
-
-    # Wykonanie algorytmu aglomeracyjnego (single / complete linkage)
     Z = linkage(data, method=method)
-    max_d_step = (max_d_range - max_d) / (num_measurements - 1)
 
-    with open(result_path, "w", newline="") as csvfile:
-        csvwriter = csv.writer(csvfile)
-        # Zapisz nagłówki kolumn
-        csvwriter.writerow(
-            [
-                "max_d",
-                "largest_cluster_points",
-                "remaining_points",
-                "num_clusters",
-                "condition",
-                "mean_cluster_distance",
-                "std_dev_distance",
-                "noise_mean_distance",
-                "noise_std_dev_distance",
-                "p1",
-                "p2",
-                "p3",
-                "p4",
-                "p5",
-                "p6",
-                "p7",
-                "p8",
-                "p9",
-                "p10",
-                "p11",
-                "p12",
-                "p13",
-                "p14",
-                "p15",
-            ]
+    D = squareform(pdist(data))
+    D_sq = D**2
+    row_sum, row_sum_sq = D.sum(axis=1), D_sq.sum(axis=1)
+    all_pairs_sum, all_pairs_sq = D.sum() / 2, D_sq.sum() / 2
+
+    # Dla każdego klastra: punkty, suma (i suma kwadratów) odległości wewnątrz,
+    # oraz suma wierszy macierzy odległości (potrzebna do statystyk szumu)
+    members = {i: [i] for i in range(n_total)}
+    inner = {i: (0.0, 0.0) for i in range(n_total)}
+    rows_of = {i: (row_sum[i], row_sum_sq[i]) for i in range(n_total)}
+
+    largest_id, largest_size, changed = None, 1, False
+    rows = []
+    for step, (a, b, height, _) in enumerate(Z):
+        a, b, new = int(a), int(b), n_total + step
+        ma, mb = members.pop(a), members.pop(b)
+        block = np.ix_(ma, mb)
+        (sa, qa), (sb, qb) = inner.pop(a), inner.pop(b)
+        inner[new] = (sa + sb + D[block].sum(), qa + qb + D_sq[block].sum())
+        (ra, rqa), (rb, rqb) = rows_of.pop(a), rows_of.pop(b)
+        rows_of[new] = (ra + rb, rqa + rqb)
+        members[new] = ma + mb
+
+        if len(members[new]) > largest_size or largest_id in (a, b):
+            largest_id, largest_size, changed = new, len(members[new]), True
+
+        # Połączenia o tej samej wysokości traktujemy razem: fcluster przy tym
+        # d_max wykona je wszystkie
+        last_at_height = step == len(Z) - 1 or Z[step + 1, 2] > height
+        if not (changed and last_at_height):
+            continue
+        changed = False
+
+        granule = members[largest_id]
+        N = len(granule)
+        remaining = n_total - N
+        g_sum, g_sq = inner[largest_id]
+        g_rows, g_rows_sq = rows_of[largest_id]
+        # Pary szum-szum = wszystkie pary - pary w granuli - pary granula-szum
+        cross, cross_sq = g_rows - 2 * g_sum, g_rows_sq - 2 * g_sq
+        noise_sum = all_pairs_sum - g_sum - cross
+        noise_sq = all_pairs_sq - g_sq - cross_sq
+
+        mean_d, std_d = _mean_std(g_sum, g_sq, N * (N - 1) / 2)
+        noise_mean, noise_std = _mean_std(noise_sum, noise_sq, remaining * (remaining - 1) / 2)
+        admissible = is_admissible(N, n_total)
+
+        p = [0.0] * 15
+        if admissible:
+            cluster_data = data[granule]
+            p[0:3] = [N / mean_d, N / mean_d**2, sqrt(N) / mean_d**2]
+            for j, k in enumerate((3, 5, 7, 9)):
+                d_k = KNN.kNNAlgorithm(cluster_data, k=k)
+                p[3 + 3 * j : 6 + 3 * j] = [N / d_k, N / d_k**2, sqrt(N) / d_k**2]
+
+        rows.append(
+            [height, N, remaining, n_total - (step + 1), "yes" if admissible else "no",
+             mean_d, std_d, noise_mean, noise_std] + p
         )
 
-        while max_d <= max_d_range:
-            clusters = fcluster(Z, max_d, criterion="distance")
-            num_clusters = len(np.unique(clusters))
+    # Przedział stałej granuli: od tego połączenia do następnego kandydata
+    for i, row in enumerate(rows):
+        low = row[0]
+        high = rows[i + 1][0] if i + 1 < len(rows) else low
+        row[0:1] = [(low + high) / 2, low, high]
 
-            # Granula = największy klaster, cała reszta = szum
-            granule_mask = largest_cluster_mask(clusters)
-            largest_cluster_data = data[granule_mask]
-            largest_cluster_points = len(largest_cluster_data)
-            remaining_points = n_total - largest_cluster_points
-
-            # Średnia i odchylenie odległości w granuli oraz w szumie
-            mean_cluster_distance, std_dev_distance = distance_stats(largest_cluster_data)
-            noise_mean_distance, noise_std_dev_distance = distance_stats(
-                data[~granule_mask]
-            )
-
-            # Wspólny warunek dopuszczalności (ten sam co w DBSCAN)
-            admissible = is_admissible(largest_cluster_points, n_total)
-
-            p1, p2, p3, p4 = 0, 0, 0, 0
-            p5, p6, p7, p8 = 0, 0, 0, 0
-            p9, p10, p11, p12 = 0, 0, 0, 0
-            p13, p14, p15 = 0, 0, 0
-
-            if admissible:
-                k3 = KNN.kNNAlgorithm(largest_cluster_data, k=3)
-                k5 = KNN.kNNAlgorithm(largest_cluster_data, k=5)
-                k7 = KNN.kNNAlgorithm(largest_cluster_data, k=7)
-                k9 = KNN.kNNAlgorithm(largest_cluster_data, k=9)
-
-                p1 = largest_cluster_points * (1 / mean_cluster_distance)
-                p2 = largest_cluster_points * (1 / mean_cluster_distance**2)
-                p3 = sqrt(largest_cluster_points) * (1 / mean_cluster_distance**2)
-
-                p4 = largest_cluster_points * (1 / k3)
-                p5 = largest_cluster_points * (1 / k3**2)
-                p6 = sqrt(largest_cluster_points) * (1 / k3**2)
-
-                p7 = largest_cluster_points * (1 / k5)
-                p8 = largest_cluster_points * (1 / k5**2)
-                p9 = sqrt(largest_cluster_points) * (1 / k5**2)
-
-                p10 = largest_cluster_points * (1 / k7)
-                p11 = largest_cluster_points * (1 / k7**2)
-                p12 = sqrt(largest_cluster_points) * (1 / k7**2)
-
-                p13 = largest_cluster_points * (1 / k9)
-                p14 = largest_cluster_points * (1 / k9**2)
-                p15 = sqrt(largest_cluster_points) * (1 / k9**2)
-
-            # Zapisz dane do pliku CSV (kolumny granuli zawsze opisują granulę)
-            csvwriter.writerow(
-                [
-                    max_d,
-                    largest_cluster_points,
-                    remaining_points,
-                    num_clusters,
-                    "yes" if admissible else "no",
-                    mean_cluster_distance,
-                    std_dev_distance,
-                    noise_mean_distance,
-                    noise_std_dev_distance,
-                    p1,
-                    p2,
-                    p3,
-                    p4,
-                    p5,
-                    p6,
-                    p7,
-                    p8,
-                    p9,
-                    p10,
-                    p11,
-                    p12,
-                    p13,
-                    p14,
-                    p15,
-                ]
-            )
-
-            # Zwiększenie wartości d_max o krok
-            max_d = max_d + max_d_step
+    pd.DataFrame(rows, columns=LINKAGE_COLUMNS).to_csv(result_path, index=False)
 
 
 def LinkageAlgorithm(file_path, method, max_d):
@@ -171,15 +151,6 @@ def LinkageBest(file_path):
     return [d_max_values[np.argmax(data[p].to_numpy())] for p in P_IDS]
 
 
-def dendrogramRange(file_path, method):
-    """Najmniejsza i największa wysokość połączenia w drzewie (zakres szukania d_max)."""
-    # Tylko x, y: etykieta nie może wpływać na odległości
-    data = np.loadtxt(file_path)[:, :2]
-    Z = linkage(data, method=method)
-    # Wysokości połączeń w Z rosną: pierwsze połączenie = najmniejsza, ostatnie = największa
-    return Z[0, 2], Z[-1, 2]
-
-
 #################################################################################################################################
 ### Eksperymenty: algorytmy zapisują tylko dane, wykresy rysuje src/plots.py na żądanie
 #################################################################################################################################
@@ -187,7 +158,6 @@ def dendrogramRange(file_path, method):
 P_IDS = [f"p{i}" for i in range(1, 16)]
 KNN_HEURISTIC_K = [3, 5, 7, 9]
 LINKAGE_METHODS = ["single", "complete"]
-LINKAGE_STEPS = 200
 
 N_TOTAL = 1000
 MAX_SIZE = 100
@@ -214,18 +184,9 @@ QUICK_DBSCAN_GRID = dict(
 
 
 def run_linkage(path, points_file, method):
-    """Pętla d_max, wybór d_max dla każdego P i heurystyka d_max = d_k całego zbioru."""
-    min_d, max_d = dendrogramRange(points_file, method)
-    result_path = f"{path}/{method}/{method}LinkageLoopResults.csv"
-    LinkageAlgorithmLoop(
-        path=path,
-        file_path=points_file,
-        method=method,
-        max_d=min_d,
-        max_d_range=max_d,
-        num_measurements=LINKAGE_STEPS,
-        result_path=result_path,
-    )
+    """Kandydaci z drzewa, wybór d_max dla każdego P i heurystyka d_max = d_k całego zbioru."""
+    result_path = f"{path}/{method}/{method}LinkageCandidates.csv"
+    LinkageCandidates(file_path=points_file, method=method, result_path=result_path)
 
     candidates = []
     try:

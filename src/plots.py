@@ -85,7 +85,7 @@ def dbscan_map(path, p_id, out=None):
 
 def linkage_curve(path, method, p_id, out=None):
     """Kryterium P i rozmiar granuli w zależności od d_max."""
-    df = pd.read_csv(f"{path}/{method}/{method}LinkageLoopResults.csv")
+    df = pd.read_csv(f"{path}/{method}/{method}LinkageCandidates.csv")
     yes = df[df["condition"] == "yes"]
     fig, (ax_p, ax_n) = plt.subplots(2, 1, figsize=(9, 6.5), sharex=True)
     ax_p.plot(yes["max_d"], yes[p_id], color=GRANULE, marker=".", ms=3)
@@ -95,8 +95,10 @@ def linkage_curve(path, method, p_id, out=None):
         ax_p.set_title(f"{method} linkage: max {p_id} przy d_max={best['max_d']:.2f}")
     ax_p.set_ylabel(p_id)
     ax_p.grid(True, alpha=0.3)
-    ax_n.plot(df["max_d"], df["largest_cluster_points"], color=GRANULE, label="granula (N)")
-    ax_n.plot(df["max_d"], df["remaining_points"], color=PULLED, label="szum")
+    ax_n.plot(df["max_d"], df["largest_cluster_points"], color=GRANULE, label="granula (N)",
+              drawstyle="steps-post")
+    ax_n.plot(df["max_d"], df["remaining_points"], color=PULLED, label="szum",
+              drawstyle="steps-post")
     ax_n.set_xlabel("d_max")
     ax_n.set_ylabel("liczba punktów")
     ax_n.legend(fontsize=8)
