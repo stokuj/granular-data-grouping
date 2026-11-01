@@ -1,7 +1,6 @@
 import numpy as np
 import pandas as pd
-import matplotlib.pyplot as plt
-from scipy.cluster.hierarchy import linkage, fcluster, dendrogram
+from scipy.cluster.hierarchy import linkage, fcluster
 from math import sqrt
 import os
 import csv
@@ -89,38 +88,10 @@ def LinkageAlgorithmLoop(
             p13, p14, p15 = 0, 0, 0
 
             if admissible:
-                k3 = KNN.kNNAlgorithm(
-                    data=largest_cluster_data,
-                    k=3,
-                    folder=path + "/" + method + "/",
-                    show_picture=False,
-                    save_picture=False,
-                    name=method + " " + str(max_d),
-                )
-                k5 = KNN.kNNAlgorithm(
-                    data=largest_cluster_data,
-                    k=5,
-                    folder=path + "/" + method + "/",
-                    show_picture=False,
-                    save_picture=False,
-                    name=method + " " + str(max_d),
-                )
-                k7 = KNN.kNNAlgorithm(
-                    data=largest_cluster_data,
-                    k=7,
-                    folder=path + "/" + method + "/",
-                    show_picture=False,
-                    save_picture=False,
-                    name=method + " " + str(max_d),
-                )
-                k9 = KNN.kNNAlgorithm(
-                    data=largest_cluster_data,
-                    k=9,
-                    folder=path + "/" + method + "/",
-                    show_picture=False,
-                    save_picture=False,
-                    name=method + " " + str(max_d),
-                )
+                k3 = KNN.kNNAlgorithm(largest_cluster_data, k=3)
+                k5 = KNN.kNNAlgorithm(largest_cluster_data, k=5)
+                k7 = KNN.kNNAlgorithm(largest_cluster_data, k=7)
+                k9 = KNN.kNNAlgorithm(largest_cluster_data, k=9)
 
                 p1 = largest_cluster_points * (1 / mean_cluster_distance)
                 p2 = largest_cluster_points * (1 / mean_cluster_distance**2)
@@ -176,351 +147,209 @@ def LinkageAlgorithmLoop(
             max_d = max_d + max_d_step
 
 
-def LinkageAlgorithm(file_path, method, max_d, name, folder, show_picture=False):
-    # Wczytanie danych z pliku
+def LinkageAlgorithm(file_path, method, max_d):
+    """Końcowe grupowanie linkage dla wybranego d_max.
+
+    Zwraca (labels, accuracy): labels to 1 = granula (największy klaster),
+    2 = szum (cała reszta), tak jak w points.txt.
+    """
     data = np.loadtxt(file_path)
-    # Wybranie tylko dwóch pierwszych kolumn (x i y), ignorując kolumnę z etykietami
-    data_xy = data[:, :2]
-    # Wykonanie algorytmu aglomeracyjnego single linkage
-    Z = linkage(data_xy, method=method)
-
-    # Wyznaczenie klastrów na podstawie dendrogramu
+    Z = linkage(data[:, :2], method=method)
     clusters = fcluster(Z, max_d, criterion="distance")
-
-    # Granula = największy klaster (etykieta 1), cała reszta = szum (etykieta 2),
-    # tak samo jak w points.txt. Bez progów zależnych od prawdziwego podziału.
-    clusters = np.where(largest_cluster_mask(clusters), 1, 2)
-
-    # Obliczenie dokładności
-    true_labels = data[:, 2].astype(int)
-
-    accuracy = accuracy_score(true_labels, clusters)
-    # print("Accuracy:", accuracy)
-    #######################################################################
-    # Wyświetlenie klastrów na płaszczyźnie 2D
-    plt.figure()
-
-    # Wyświetlenie punktów danych
-    plt.scatter(data[:, 0], data[:, 1], c=clusters, cmap="viridis", alpha=0.5, s=5)
-
-    # Tworzenie tablicy Z dla konturów klastrów
-    x = np.linspace(min(data[:, 0]), max(data[:, 0]), 100)
-    y = np.linspace(min(data[:, 1]), max(data[:, 1]), 100)
-    X, Y = np.meshgrid(x, y)
-    Z = np.zeros_like(X)
-    for i in range(len(x)):
-        for j in range(len(y)):
-            dists = np.sqrt((data[:, 0] - X[j, i]) ** 2 + (data[:, 1] - Y[j, i]) ** 2)
-            if np.min(dists) < max_d:
-                Z[j, i] = clusters[np.argmin(dists)]
-            else:
-                Z[j, i] = np.nan  # Ustawienie obszarów poza zasięgiem klastrów na NaN
-
-    plt.contourf(X, Y, Z, alpha=0.1, cmap="viridis")
-
-    # Ustawienie zakresu osi x i y
-    plt.xlim(min(data[:, 0]) - 5, max(data[:, 0]) + 5)
-    plt.ylim(min(data[:, 1]) - 5, max(data[:, 1]) + 5)
-
-    plt.title(f"{method} -- {name}: {round(max_d, 2)} Accuracy: {accuracy}")
-    plt.xlabel("Współrzędna X")
-    plt.ylabel("Współrzędna Y")
-    plt.colorbar(label="Numer klastra")
-
-    output_file = f"{folder}/{method}/clustering_{name}.png"
-    plt.savefig(output_file, dpi=1000)
-    if show_picture:
-        plt.show()
-    plt.close()
-
-    #######################################################################
-    # Tworzenie listy punktów w formacie "x_punktu y_punktu id_clustra"
-    points_with_clusters = []
-    for i in range(len(data)):
-        points_with_clusters.append((data[i][0], data[i][1], clusters[i]))
-
-    # Zapisywanie punktów do pliku CSV
-    output_file = f"{folder}/{method}/LinkageResults_{name}.csv"
-    with open(output_file, mode="w", newline="") as csvfile:
-        csvwriter = csv.writer(csvfile)
-        # Zapisz nagłówki kolumn
-        csvwriter.writerow(["x_punktu", "y_punktu", "id_klastra"])
-        for point in points_with_clusters:
-            csvwriter.writerow(point)
-
-    # print(f"Punkty zapisano do pliku {output_file}")
+    labels = np.where(largest_cluster_mask(clusters), 1, 2)
+    accuracy = accuracy_score(data[:, 2].astype(int), labels)
+    return labels, accuracy
 
 
-def LinkageChart(file_path, draw):
-    # Wczytanie wyników pętli; do wyboru d_max tylko dopuszczalni kandydaci
+def LinkageBest(file_path):
+    """d_max maksymalizujące każde z kryteriów p1..p15 wśród dopuszczalnych kandydatów."""
     data = pd.read_csv(file_path)
     data = data[data["condition"] == "yes"]
     if data.empty:
         raise ValueError(f"Brak dopuszczalnych kandydatów na granulę w {file_path}")
-
     d_max_values = data["max_d"].to_numpy()
-
-    # d_max maksymalizujące każde z kryteriów p1..p15
-    # (kolejność: p1, p2, p3, k3_p1, k3_p2, k3_p3, ..., k9_p1, k9_p2, k9_p3)
-    p_columns = [f"p{i}" for i in range(1, 16)]
-    best_d_max = [d_max_values[np.argmax(data[col].to_numpy())] for col in p_columns]
-
-    if draw:
-        # Liczba punktów w granuli i w szumie w zależności od d_max
-        plt.figure(figsize=(15, 6))
-        plt.plot(
-            d_max_values,
-            data["largest_cluster_points"],
-            label="Liczba punktów w klastrze",
-            color="blue",
-        )
-        plt.plot(
-            d_max_values,
-            data["remaining_points"],
-            label="Liczba punktów w szumie",
-            color="red",
-        )
-        plt.xlabel("d_max")
-        plt.ylabel("Liczba punktów")
-        plt.title("Liczba punktów w klastrze oraz szumie")
-        plt.grid(True)
-        plt.legend()
-
-        # Kryterium p1 w zależności od d_max
-        p1 = data["p1"].to_numpy()
-        plt.figure(figsize=(15, 6))
-        plt.plot(d_max_values, p1, label="p1", color="green")
-        plt.scatter(
-            best_d_max[0],
-            p1.max(),
-            color="black",
-            label=f"D_max dla max ({best_d_max[0]})",
-        )
-        plt.xlabel("d_max")
-        plt.ylabel("p1")
-        plt.title("Wartość p1 dla parametru d_max")
-        plt.grid(True)
-        plt.legend()
-        plt.show()
-    return best_d_max
+    return [d_max_values[np.argmax(data[p].to_numpy())] for p in P_IDS]
 
 
-def makeDendrogram(file_path, method, draw):
-    # Wczytanie danych z pliku: tylko x, y (etykieta nie może wpływać na odległości)
+def dendrogramRange(file_path, method):
+    """Najmniejsza i największa wysokość połączenia w drzewie (zakres szukania d_max)."""
+    # Tylko x, y: etykieta nie może wpływać na odległości
     data = np.loadtxt(file_path)[:, :2]
-
-    # Wykonanie algorytmu aglomeracyjnego (single / complete linkage)
     Z = linkage(data, method=method)
-
     # Wysokości połączeń w Z rosną: pierwsze połączenie = najmniejsza, ostatnie = największa
-    min_distance = Z[0, 2]
-    max_distance = Z[-1, 2]
-
-    if draw:
-        plt.figure(figsize=(10, 5))
-        dendrogram(Z)
-        plt.title("Dendrogram - Algorytm aglomeracyjny")
-        plt.xlabel("Indeksy danych")
-        plt.ylabel("Odległość")
-        plt.show()
-    return min_distance, max_distance
+    return Z[0, 2], Z[-1, 2]
 
 
 #################################################################################################################################
+### Eksperymenty: algorytmy zapisują tylko dane, wykresy rysuje src/plots.py na żądanie
 #################################################################################################################################
 
+P_IDS = [f"p{i}" for i in range(1, 16)]
+KNN_HEURISTIC_K = [3, 5, 7, 9]
+LINKAGE_METHODS = ["single", "complete"]
+LINKAGE_STEPS = 200
 
-def p_name(param):
-    for name, value in globals().items():
-        if value is param:
-            return name
-    return None
+N_TOTAL = 1000
+MAX_SIZE = 100
+RADII = [30]
+
+GENERATORS = {
+    "circle_A": (pg.generate_points_circle, None),
+    "circle_B": (pg.generate_points_mises, None),
+    "circle_C": (pg.generate_points_normal, None),
+    "ring": (pg.generate_points_ring, None),
+    # "shape_A": (pg.generate_points_in_shape, "drawn_figure_A.txt"),
+}
+NOISE_PERCENTAGES = [30, 40, 50, 60, 70]
+DBSCAN_GRID = dict(
+    min_epsilon=2, max_epsilon=20.0, epsilon_step=0.2, min_min_samples=20, max_min_samples=150
+)
+
+# Szybki przebieg do sprawdzenia, że całość działa
+QUICK_GENERATORS = ["circle_A", "ring"]
+QUICK_NOISE_PERCENTAGES = [50]
+QUICK_DBSCAN_GRID = dict(
+    min_epsilon=2, max_epsilon=12.0, epsilon_step=1.0, min_min_samples=10, max_min_samples=40
+)
 
 
-def run_experiments():
-    maxSize = 100
-    results_root = "results"
+def run_linkage(path, points_file, method):
+    """Pętla d_max, wybór d_max dla każdego P i heurystyka d_max = d_k całego zbioru."""
+    min_d, max_d = dendrogramRange(points_file, method)
+    result_path = f"{path}/{method}/{method}LinkageLoopResults.csv"
+    LinkageAlgorithmLoop(
+        path=path,
+        file_path=points_file,
+        method=method,
+        max_d=min_d,
+        max_d_range=max_d,
+        num_measurements=LINKAGE_STEPS,
+        result_path=result_path,
+    )
+
+    candidates = []
+    try:
+        candidates += list(zip(P_IDS, LinkageBest(result_path)))
+    except ValueError as e:
+        print(e)
+    xy = np.loadtxt(points_file)[:, :2]
+    candidates += [(f"knn{k}", KNN.kNNAlgorithm(xy, k)) for k in KNN_HEURISTIC_K]
+
+    rows, labels = [], {}
+    for criterion, d_max in candidates:
+        lab, acc = LinkageAlgorithm(points_file, method, d_max)
+        rows.append(
+            dict(method=method, criterion=criterion, d_max=d_max,
+                 n_granule=int((lab == 1).sum()), accuracy=acc)
+        )
+        labels[f"{method}_{criterion}"] = lab
+    return rows, labels
+
+
+def run_dbscan(path, points_file, grid):
+    """Siatka eps x min_samples i wybór parametrów dla każdego P."""
+    db.DBscanAlgorithmLoop(**grid, folder=path)
+    rows, labels = [], {}
+    for p_id in P_IDS:
+        best = db.DBscanBest(path, p_id)
+        if best is None:
+            print(f"Brak dopuszczalnych kandydatów DBSCAN dla {p_id} w {path}")
+            continue
+        epsilon, min_samples, _ = best
+        lab, acc = db.DBscanFinal(points_file, epsilon, min_samples)
+        rows.append(
+            dict(method="dbscan", criterion=p_id, epsilon=epsilon, min_samples=min_samples,
+                 n_granule=int((lab == 1).sum()), accuracy=acc)
+        )
+        labels[f"dbscan_{p_id}"] = lab
+    return rows, labels
+
+
+def run_experiments(
+    results_root="results",
+    generators=None,
+    noise_percentages=None,
+    dbscan_grid=None,
+):
+    generators = generators or list(GENERATORS)
+    noise_percentages = noise_percentages or NOISE_PERCENTAGES
+    dbscan_grid = dbscan_grid or DBSCAN_GRID
     os.makedirs(results_root, exist_ok=True)
 
-    generators = {
-        "circle_A": (pg.generate_points_circle, None),
-        "circle_B": (pg.generate_points_mises, None),
-        "circle_C": (pg.generate_points_normal, None),
-        "ring": (pg.generate_points_ring, None),
-        # "shape_A"   : (pg.generate_points_in_shape, "drawn_figure_A.txt"),
-        # "shape_B"   : (pg.generate_points_in_shape, "drawn_figure_B.txt"),
-        # "shape_C"   : (pg.generate_points_in_shape, "drawn_figure_C.txt"),
-    }
-    csv_file = os.path.join(results_root, "wyniki_czasu_wykonania.csv")
-
-    # # Tworzenie nagłówków pliku CSV
-    # with open(csv_file, mode='w', newline='') as file:
-    #     writer = csv.writer(file)
-    #     writer.writerow(['generator', 'noisePoints', 'circle_radius', 'time_dbscan', 'time_single', 'time_complete'])
-
-    # Pętla szumu 30% - 70%, skok 10%
-    noise_percentages = [30, 40, 50, 60, 70]
-
+    all_rows, time_rows = [], []
     for noise_percent in noise_percentages:
-        noisePoints = int((noise_percent / 100) * 1000)
-        num_points = 1000 - noisePoints
+        noise_points = int((noise_percent / 100) * N_TOTAL)
+        num_points = N_TOTAL - noise_points
 
-        # Pętla generatora - kształu
-        for folder, (generator_function, shape_name) in generators.items():
-            # Pętlna rozmiaru koła jeżeli koło - aktulanie działą raz więc to NIE PĘTLA!
-            for circle_radius in np.arange(30, 31, 20):
-                #print(circle_radius, noisePoints, generator_function.__name__)
-
-                ##############################################################
-                ### GENEREATE POINTS
-                ##############################################################
-                experiment_subpath = (
-                    f"{folder}/{circle_radius}/{noisePoints}"
-                    if generator_function != pg.generate_points_in_shape
-                    else f"{folder}/{noisePoints}"
+        for shape in generators:
+            generator_function, shape_name = GENERATORS[shape]
+            for circle_radius in RADII:
+                subpath = (
+                    f"{shape}/{noise_points}"
+                    if shape_name
+                    else f"{shape}/{circle_radius}/{noise_points}"
                 )
-                path = os.path.join(results_root, experiment_subpath)
-
-                for subfolder in [path, path + "/single", path + "/complete"]:
-                    if not os.path.exists(subfolder):
-                        os.makedirs(subfolder)
+                path = os.path.join(results_root, subpath)
+                for subfolder in [path] + [f"{path}/{m}" for m in LINKAGE_METHODS]:
+                    os.makedirs(subfolder, exist_ok=True)
 
                 points_file = f"{path}/points.txt"
                 if not os.path.exists(points_file):
                     pg.generate_points(
-                        generator_function,
-                        path,
-                        noisePoints,
-                        circle_radius,
-                        shape_name,
-                        num_points,
-                        maxSize,
+                        generator_function, path, noise_points, circle_radius,
+                        shape_name, num_points, MAX_SIZE,
                     )
-                ##############################################################
-                
-                # # Wczytanie danych z pliku
-                data = np.loadtxt(points_file)
 
-                # ### KNN
-                k_names = [3, 5, 7, 9]
-                p_names = [
-                    "p1",
-                    "p2",
-                    "p3",
-                    "k3_p1",
-                    "k3_p2",
-                    "k3_p3",
-                    "k5_p1",
-                    "k5_p2",
-                    "k5_p3",
-                    "k7_p1",
-                    "k7_p2",
-                    "k7_p3",
-                    "k9_p1",
-                    "k9_p2",
-                    "k9_p3",
-                ]
+                rows, labels, times = [], {}, {}
+                for method in LINKAGE_METHODS:
+                    start = time.time()
+                    r, lab = run_linkage(path, points_file, method)
+                    times[f"time_{method}"] = time.time() - start
+                    rows += r
+                    labels.update(lab)
 
-                # ### Single i complete linkage
-                # methods = ["single", "complete"]
+                start = time.time()
+                r, lab = run_dbscan(path, points_file, dbscan_grid)
+                times["time_dbscan"] = time.time() - start
+                rows += r
+                labels.update(lab)
 
-                # for method in methods:
-                #     start_time = time.time()
+                # Dane tej konfiguracji: podsumowanie i wybrane podziały
+                config = dict(shape=shape, radius=circle_radius, noise_points=noise_points)
+                summary = pd.DataFrame([{**config, **row} for row in rows])
+                summary.to_csv(f"{path}/summary.csv", index=False)
 
-                #     # Tworzenie dendrogramu i uruchamianie pętli algorytmu Linkage
-                #     min_distance, max_distance = makeDendrogram(
-                #         file_path=f"{path}/points.txt", method=method, draw=False
-                #     )
-                #     result_path = f"{path}/{method}/{method}LinkageLoopResults.csv"
-                #     LinkageAlgorithmLoop(
-                #         path=path,
-                #         file_path=f"{path}/points.txt",
-                #         method=method,
-                #         max_d=min_distance,
-                #         max_d_range=max_distance,
-                #         num_measurements=200,
-                #         result_path=result_path,
-                #     )
-                #     p_val = LinkageChart(file_path=result_path, draw=False)
+                points = np.loadtxt(points_file)
+                labels_df = pd.DataFrame(
+                    {"x": points[:, 0], "y": points[:, 1], "true": points[:, 2].astype(int)}
+                )
+                labels_df = pd.concat([labels_df, pd.DataFrame(labels)], axis=1)
+                labels_df.to_csv(f"{path}/labels.csv", index=False)
 
-                #     # Uruchamianie algorytmu kNN i algorytmu Linkage
-                #     for k in k_names:
-                #         k_val = KNN.kNNAlgorithm(
-                #             data,
-                #             k=k,
-                #             folder=path,
-                #             show_picture=False,
-                #             save_picture=False,
-                #             name=None,
-                #         )
-                #         LinkageAlgorithm(
-                #             file_path=f"{path}/points.txt",
-                #             method=method,
-                #             max_d=k_val,
-                #             name=f"k{k}",
-                #             folder=path,
-                #             show_picture=False,
-                #         )
-
-                #     # Uruchamianie algorytmu Linkage dla każdego p w p_names
-                #     for i, p in enumerate(p_names):
-                #         LinkageAlgorithm(
-                #             file_path=f"{path}/points.txt",
-                #             method=method,
-                #             max_d=p_val[i],
-                #             name=p,
-                #             folder=path,
-                #             show_picture=False,
-                #         )
-                #     end_time = time.time()
-                #     elapsed_time = end_time - start_time
-
-                #     if method == "single":
-                #         time_single = elapsed_time
-                #     else:
-                #         time_complete = elapsed_time
-
-                # ### DBscan
-                # start_time = time.time()
-
-                # db.DBscanAlgorithmLoop(2, 20.0, 0.2, 20, 150, folder=path)
-
-                # for i in range(1, 16):
-                #     ep, samp, p_val = db.DBscanChart(
-                #         folder=path, show_picture=False, p_id=f"p{i}"
-                #     )
-                #     db.DBscan(
-                #         file_path=f"{path}/points.txt",
-                #         folder=path,
-                #         epsilon=ep,
-                #         samples=samp,
-                #         p_id=f"p{i}",
-                #         p_val=p_val,
-                #     )
-
-                # end_time = time.time()
-                # time_dbscan = end_time - start_time
-
-                # ### Zapis wyników do pliku CSV
-                # with open(csv_file, mode="a", newline="") as file:
-                #     writer = csv.writer(file)
-                #     writer.writerow(
-                #         [
-                #             folder,
-                #             noisePoints,
-                #             circle_radius,
-                #             time_dbscan,
-                #             time_single,
-                #             time_complete,
-                #         ]
-                #     )
-
-                # # ### Wykresy
-                # pg.create_combined_plot(path)
-
-                # if generator_function == pg.generate_points_in_shape:
-                #     break
+                # Pliki zbiorcze nadpisywane po każdej konfiguracji (częściowy postęp zostaje)
+                all_rows.append(summary)
+                pd.concat(all_rows, ignore_index=True).to_csv(
+                    os.path.join(results_root, "summary.csv"), index=False
+                )
+                time_rows.append({**config, **times})
+                pd.DataFrame(time_rows).to_csv(
+                    os.path.join(results_root, "wyniki_czasu_wykonania.csv"), index=False
+                )
+                print(f"{path}: gotowe ({', '.join(f'{k}={v:.1f}s' for k, v in times.items())})")
 
 
 if __name__ == "__main__":
-    run_experiments()
+    import argparse
+
+    parser = argparse.ArgumentParser(description="Porównanie DBSCAN i single/complete linkage")
+    parser.add_argument("--results", default="results", help="katalog wyników")
+    parser.add_argument(
+        "--quick", action="store_true",
+        help="szybki test: circle_A i ring, szum 50%%, rzadka siatka DBSCAN",
+    )
+    args = parser.parse_args()
+
+    if args.quick:
+        run_experiments(args.results, QUICK_GENERATORS, QUICK_NOISE_PERCENTAGES, QUICK_DBSCAN_GRID)
+    else:
+        run_experiments(args.results)

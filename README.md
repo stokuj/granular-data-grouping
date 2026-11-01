@@ -11,13 +11,14 @@ project_root/
 ├── src/
 │   ├── point_generators.py  # Data generation
 │   ├── DBscan.py            # DBSCAN implementation
-│   ├── KNN.py               # kNN algorithm implementation
-│   └── main.py              # Experimental script
+│   ├── KNN.py               # mean k-NN distance (d_k)
+│   ├── granule.py           # shared admissibility rule and granule helpers
+│   ├── main.py              # linkage + experiment runner (data only)
+│   └── plots.py             # plots on demand from saved data
 └── results/
-    ├── time_of_exec.csv
-    ├── circle/...
-    ├── ring/...
-    └── normal/...
+    ├── summary.csv
+    ├── wyniki_czasu_wykonania.csv
+    └── <shape>/<radius>/<noise_points>/...
 ```
 
 ## Problem Domain
@@ -109,83 +110,35 @@ uv sync
 
 ## Example Usage
 
-### Data Generation
-```python
-from src import point_generators as pg
-# generate 800 points in a circle with radius 50 + 200 noise points
-pg.generate_points_circle(
-    output_folder='results/circle',
-    noise_points=200,
-    circle_radius=50,
-    num_points=800,
-    max_size=100
-)
+Algorithms only compute and save data. Plots are drawn on demand afterwards.
+
+### Run the comparison
+```bash
+uv run python -m src.main --quick   # circle_A + ring, 50% noise, coarse DBSCAN grid (~10 s)
+uv run python -m src.main           # full grid: 4 shapes x 5 noise levels
 ```
 
-### DBSCAN
-```python
-from src.DBscan import DBscanAlgorithmLoop, DBscanChart, DBscan
-# iterate over eps ∈ [2,20], step=0.5, MinPts ∈ [5,50]
-DBscanAlgorithmLoop(2,20,0.5,5,50,'results/circle')
-# analyze charts and select optimal parameters
-eps, min_pts, p_val = DBscanChart('results/circle', show_picture=True, p_id='p1')
-# final execution
-DBscan(
-    file_path='results/circle/points.txt',
-    folder='results/circle',
-    epsilon=eps,
-    samples=min_pts,
-    p_id='p1',
-    p_val=p_val
-)
+Per configuration (`results/<shape>/<radius>/<noise_points>/`):
+- `points.txt`: x, y, true label (1 = cluster, 2 = noise)
+- `single/`, `complete/`: `*LinkageLoopResults.csv`, one row per d_max candidate
+- `dbScan/dbScanResults.csv`: one row per (eps, min_samples) candidate
+- `summary.csv`: best parameters, granule size and accuracy per method x criterion
+- `labels.csv`: selected partitions, one column per method x criterion (e.g. `single_p1`, `dbscan_p3`)
+
+Across all configurations: `results/summary.csv` and `results/wyniki_czasu_wykonania.csv` (run times).
+
+All methods use the same admissibility rule (`src/granule.py`): the granule has at least 10% of
+the points and does not cover all of them.
+
+### Plots on demand
+```bash
+uv run python -m src.plots partition results/circle_A/30/500 single_p1
+uv run python -m src.plots dbscan-map results/circle_A/30/500 p1
+uv run python -m src.plots linkage-curve results/circle_A/30/500 complete p1
+uv run python -m src.plots dendrogram results/circle_A/30/500 single
+uv run python -m src.plots accuracy results --criterion p1 --shape circle_A
 ```
-
-### Single / Complete Linkage
-```python
-from src.main import makeDendrogram, LinkageAlgorithmLoop, LinkageAlgorithm
-# calculate d_min, d_max range
-d_min, d_max = makeDendrogram('results/circle/points.txt', method='single', draw=True)
-# iterate over 200 steps
-LinkageAlgorithmLoop(
-    path='results/circle',
-    file_path='results/circle/points.txt',
-    method='single',
-    max_d=d_min,
-    max_d_range=d_max,
-    num_measurements=200,
-    result_path='results/circle/single/results_loop.csv'
-)
-# final run for optimal d_max
-opt_d = 10.5  # result from chart
-LinkageAlgorithm(
-    file_path='results/circle/points.txt',
-    method='single',
-    max_d=opt_d,
-    name='opt',
-    folder='results/circle',
-    show_picture=True
-)
-```
-
-## Implementation Details
-
-1. `src/point_generators.py`:
-    - Function `generate_points`: wrapper selecting the appropriate generator.
-    - Output formats: `points.txt` with three columns (x, y, label).
-
-2. `src/DBscan.py`:
-    - `DBscanAlgorithmLoop`: saves P1–P15 results to CSV.
-    - `DBscanChart`: draws charts of measures vs eps / MinPts.
-    - `DBscan`: generates final clusters and saves `DBscanResults.csv`.
-
-3. `src/KNN.py`:
-    - Easy integration with `LinkageAlgorithmLoop` for calculating P1–P15 metrics.
-
-4. `src/main.py`:
-    - Import of all modules.
-    - Configuration of experiment parameters.
-    - Loops over noise levels, radii, and shapes.
-    - Saving results to `wyniki_czasu_wykonania.csv`.
+Add `--out file.png` (or `.pdf` / `.svg`) to save instead of showing.
 
 ## Experimental Results
 

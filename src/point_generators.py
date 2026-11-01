@@ -1,13 +1,9 @@
 # point_generators.py
 
 import numpy as np
-import matplotlib.pyplot as plt
-import os
-import math
 from collections.abc import Callable
 from typing import TypeAlias, cast
 from matplotlib.path import Path
-from PIL import Image
 from numpy.typing import NDArray
 
 FloatArray: TypeAlias = NDArray[np.float64]
@@ -346,7 +342,7 @@ def generate_points(
     maxSize: float,
 ) -> None:
     """
-    Generate point sets, plot them, and save them to disk.
+    Generate point sets and save them to disk.
 
     Parameters
     ----------
@@ -378,111 +374,3 @@ def generate_points(
 
 
     save_points_to_file(x_circle, y_circle, x_random, y_random, folder=folder)
-
-
-def create_combined_plot(path: str) -> bool:
-    """
-    Combine existing result images into one grid image.
-
-    Parameters
-    ----------
-    path : str
-        Base experiment directory containing output image subfolders.
-
-    Returns
-    -------
-    bool
-        ``True`` if a combined image was saved, otherwise ``False``.
-    """
-    image_paths_and_titles = [
-        (f"{path}/complete/clustering_p1.png", "Complete p1"),
-        (f"{path}/complete/clustering_p2.png", "Complete p2"),
-        (f"{path}/complete/clustering_p3.png", "Complete p3"),
-        (f"{path}/complete/clustering_k3_p1.png", "Complete k3_p1"),
-        (f"{path}/complete/clustering_k3_p2.png", "Complete k3_p2"),
-        (f"{path}/complete/clustering_k3_p3.png", "Complete k3_p3"),
-        (f"{path}/complete/clustering_k5_p1.png", "Complete k5_p1"),
-        (f"{path}/complete/clustering_k5_p2.png", "Complete k5_p2"),
-        (f"{path}/complete/clustering_k5_p3.png", "Complete k5_p3"),
-        (f"{path}/complete/clustering_k7_p1.png", "Complete k7_p1"),
-        (f"{path}/complete/clustering_k7_p2.png", "Complete k7_p2"),
-        (f"{path}/complete/clustering_k7_p3.png", "Complete k7_p3"),
-        (f"{path}/complete/clustering_k9_p1.png", "Complete k9_p1"),
-        (f"{path}/complete/clustering_k9_p2.png", "Complete k9_p2"),
-        (f"{path}/complete/clustering_k9_p3.png", "Complete k9_p3"),
-        (f"{path}/single/clustering_p1.png", "Single p1"),
-        (f"{path}/single/clustering_p2.png", "Single p2"),
-        (f"{path}/single/clustering_p3.png", "Single p3"),
-        (f"{path}/single/clustering_k3_p1.png", "Single k3_p1"),
-        (f"{path}/single/clustering_k3_p2.png", "Single k3_p2"),
-        (f"{path}/single/clustering_k3_p3.png", "Single k3_p3"),
-        (f"{path}/single/clustering_k5_p1.png", "Single k5_p1"),
-        (f"{path}/single/clustering_k5_p2.png", "Single k5_p2"),
-        (f"{path}/single/clustering_k5_p3.png", "Single k5_p3"),
-        (f"{path}/single/clustering_k7_p1.png", "Single k7_p1"),
-        (f"{path}/single/clustering_k7_p2.png", "Single k7_p2"),
-        (f"{path}/single/clustering_k7_p3.png", "Single k7_p3"),
-        (f"{path}/single/clustering_k9_p1.png", "Single k9_p1"),
-        (f"{path}/single/clustering_k9_p2.png", "Single k9_p2"),
-        (f"{path}/single/clustering_k9_p3.png", "Single k9_p3"),
-        (f"{path}/single/clustering_k3.png", "Single k3"),
-        (f"{path}/single/clustering_k5.png", "Single k5"),
-        (f"{path}/single/clustering_k7.png", "Single k7"),
-        (f"{path}/dbScan/dbScan_p1.png", ""),
-        (f"{path}/dbScan/dbScan_p2.png", ""),
-        (f"{path}/dbScan/dbScan_p3.png", ""),
-        (f"{path}/dbScan/dbScan_p4.png", ""),
-        (f"{path}/dbScan/dbScan_p5.png", ""),
-        (f"{path}/dbScan/dbScan_p6.png", ""),
-        (f"{path}/dbScan/dbScan_p7.png", ""),
-        (f"{path}/dbScan/dbScan_p8.png", ""),
-        (f"{path}/dbScan/dbScan_p9.png", ""),
-        (f"{path}/dbScan/dbScan_p10.png", ""),
-        (f"{path}/dbScan/dbScan_p11.png", ""),
-        (f"{path}/dbScan/dbScan_p12.png", ""),
-        (f"{path}/dbScan/dbScan_p13.png", ""),
-        (f"{path}/dbScan/dbScan_p14.png", ""),
-        (f"{path}/dbScan/dbScan_p15.png", ""),
-    ]
-
-    # Filtracja istniejących plików
-    image_paths_and_titles = [
-        (img_path, title)
-        for img_path, title in image_paths_and_titles
-        if os.path.exists(img_path)
-    ]
-
-    if not image_paths_and_titles:
-        print(f"No plots found for {path}, skipping combined plot.")
-        return False
-
-    # Oblicz liczbę wierszy i kolumn potrzebnych do wyświetlenia wszystkich obrazów
-    num_images = len(image_paths_and_titles)
-    cols = 3
-    rows = math.ceil(num_images / cols)
-
-    # Wczytaj wszystkie obrazy
-    images = [Image.open(img_path) for img_path, _ in image_paths_and_titles]
-
-    # Rozmiar pojedynczego obrazu (zakładamy, że wszystkie obrazy mają ten sam rozmiar)
-    img_width, img_height = images[0].size
-    print(img_width)
-    print(img_height)
-    # Utworzenie nowego obrazu o odpowiednich wymiarach
-    combined_image = Image.new("RGB", (cols * img_width, rows * img_height))
-
-    # Umieszczenie każdego obrazu w odpowiednim miejscu w złożonym obrazie
-    for i, image in enumerate(images):
-        row = i // cols
-        col = i % cols
-        combined_image.paste(image, (col * img_width, row * img_height))
-
-    # Ścieżka wyjściowa dla złożonego obrazu
-    output_path = f"{path}/combined_plot.png"
-
-    # Zapisz złożony obraz
-    combined_image.save(output_path, format="PNG", dpi=(1000, 1000))
-
-    return True
-
-    ################################################################################################################################
